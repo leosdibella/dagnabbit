@@ -16,11 +16,11 @@
     "as:build": "npm run as:build:debug && npm run as:build:release",
     "as:start": "npx serve .",
     "ts:test": "npm run process && env TS_NODE_COMPILER_OPTIONS='{\"module\": \"commonjs\", \"types\": [\"assemblyscript/std/types/portable\", \"node\"] }' mocha -r ts-node/register -r tsconfig-paths/register 'tests/**/*.ts'",
-    "ts:build": "tsc",
-    "ts:check": "tsc --noEmit --skipLibCheck",
-    "ts:check:diagnostics": "tsc --noEmit --skipLibCheck --extendedDiagnostics",
-    "ts:check:all": "tsc --noEmit",
-    "ts:check:all:diagnostics": "tsc --noEmit --extendedDiagnostics"
+    "ts:build": "tsc --project tsconfig.build.json",
+    "ts:check": "tsc --project tsconfig.build.json --noEmit --skipLibCheck",
+    "ts:check:diagnostics": "tsc --project tsconfig.build.json --noEmit --skipLibCheck --extendedDiagnostics",
+    "ts:check:all": "tsc --project tsconfig.build.json --noEmit",
+    "ts:check:all:diagnostics": "tsc --project tsconfig.build.json --noEmit --extendedDiagnostics"
   },
   "keywords": [
     "DAG",

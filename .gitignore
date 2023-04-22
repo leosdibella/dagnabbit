@@ -1,3 +1,4 @@
 /node_modules
-/post-processed-src
+/processed-src
 /build
+/dist

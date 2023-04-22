@@ -24,7 +24,7 @@
     "**/tests/*.spec.ts",
     "**/*.js",
     "**/*.mjs",
-    "post-processed-src/**/*.*"
+    "processed-src/**/*.*"
   ],
   "rules": {
     "accessor-pairs": "error",

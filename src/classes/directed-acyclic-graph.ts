@@ -223,7 +223,7 @@ export class DirectedAcyclicGraph<T = unknown> {
   }
 
   public addEdges(edges: IEdge[]) {
-    return edges.forEach(this.addEdge);
+    return edges.forEach((e) => this.addEdge(e));
   }
 
   public addEdge(edge: IEdge) {
@@ -294,7 +294,7 @@ export class DirectedAcyclicGraph<T = unknown> {
   }
 
   public addVertices(values: T[]) {
-    return values.map(this.addVertex);
+    return values.map((v) => this.addVertex(v));
   }
 
   public addVertex(value: T) {
@@ -347,7 +347,7 @@ export class DirectedAcyclicGraph<T = unknown> {
   public removeVerticesByValues(
     vertexRemovalParameters: IVertexRemovalParameters<T>[]
   ) {
-    return vertexRemovalParameters.map(this.removeVertexByValue);
+    return vertexRemovalParameters.map((p) => this.removeVertexByValue(p));
   }
 
   public removeVertexbyIndex(vertexIndex: number) {
@@ -374,7 +374,7 @@ export class DirectedAcyclicGraph<T = unknown> {
   }
 
   public removeVerticesByIndices(vertexIndices: number[]) {
-    return vertexIndices.map(this.removeVertexbyIndex);
+    return vertexIndices.map((v) => this.removeVertexbyIndex(v));
   }
 
   public topologicalSort(): T[] {

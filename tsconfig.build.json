@@ -1,0 +1,33 @@
+{
+  "compilerOptions": {
+    "esModuleInterop": true,
+    "noUnusedLocals": true,
+    "noImplicitAny": true,
+    "baseUrl": ".",
+    "outDir": "./dist/",
+    "sourceMap": true,
+    "declaration": true,
+    "downlevelIteration": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "module": "ESNext",
+    "moduleResolution": "node",
+    "importHelpers": true,
+    "paths": {},
+    "target": "ES2019",
+    "typeRoots": ["node_modules/@types"],
+    "types": ["assemblyscript/std/types/portable", "node"],
+    "lib": ["dom", "ES2020"],
+    "strictNullChecks": true,
+    "strictPropertyInitialization": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": [
+    "./processed-src/**/*.ts"
+  ],
+  "exclude": [
+    "./src",
+    "./node_modules",
+    "./tests"
+  ]
+}

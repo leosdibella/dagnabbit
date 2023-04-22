@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 
-const destination = 'post-processed-src';
+const destination = 'processed-src';
 const source = 'src';
 
 const base64WasmInjectionFilePath = 'classes/directed-acyclic-graph.ts';

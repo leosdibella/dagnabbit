@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-magic-numbers */
-import { DirectedAcyclicGraph, DirectedAcyclicGraphError } from '../post-processed-src/classes';
+import { DirectedAcyclicGraph, DirectedAcyclicGraphError } from '../processed-src/classes';
 import { expect } from 'chai';
 import 'mocha';
 
@@ -15,24 +15,24 @@ describe('Directed Ayclic Graphs', () => {
     });
 
     const vertexIndex = dag.addVertex(1);
-    const vertexIndex2 = dag.addVertex(1);
+    const vertexIndex2 = dag2.addVertex(1);
 
     expect(vertexIndex).to.equal(0);
     expect(vertexIndex2).to.equal(0);
 
     const vertexIndices = dag.addVertices([1, 2, 3, 4]);
-    const vertexIndices2 = dag.addVertices([1, 2, 3, 4]);
+    const vertexIndices2 = dag2.addVertices([1, 2, 3, 4]);
 
     expect(vertexIndices[0]).to.equal(0);
     expect(vertexIndices[1]).to.equal(1);
     expect(vertexIndices[2]).to.equal(2);
-    expect(vertexIndices[2]).to.equal(3);
+    expect(vertexIndices[3]).to.equal(3);
     expect(dag.vertices.length).to.equal(4);
 
     expect(vertexIndices2[0]).to.equal(0);
     expect(vertexIndices2[1]).to.equal(1);
     expect(vertexIndices2[2]).to.equal(2);
-    expect(vertexIndices2[2]).to.equal(3);
+    expect(vertexIndices2[3]).to.equal(3);
     expect(dag2.vertices.length).to.equal(4);
 
     dag.addEdge({
@@ -45,10 +45,10 @@ describe('Directed Ayclic Graphs', () => {
       toVertexIndex: 1
     });
 
-    expect(dag.edges.length).to.equal(1);
+    expect(dag.edges.length).to.equal(4);
     expect(dag.edges[0]).to.deep.equal([1]);
 
-    expect(dag2.edges.length).to.equal(1);
+    expect(dag2.edges.length).to.equal(4);
     expect(dag2.edges[0]).to.deep.equal([1]);
 
     dag.addEdges([
@@ -73,10 +73,10 @@ describe('Directed Ayclic Graphs', () => {
       }
     ]);
 
-    expect(dag.edges.length).to.equal(3);
+    expect(dag.edges.length).to.equal(4);
     expect(dag.edges[1]).to.deep.equal([2, 3]);
 
-    expect(dag2.edges.length).to.equal(3);
+    expect(dag2.edges.length).to.equal(4);
     expect(dag2.edges[1]).to.deep.equal([2, 3]);
 
     expect(() => dag.addEdge({
