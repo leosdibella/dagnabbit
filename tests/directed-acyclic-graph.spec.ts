@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-magic-numbers */
-import { DirectedAcyclicGraph, DirectedAcyclicGraphError } from '../src/classes';
+import { DirectedAcyclicGraph, DirectedAcyclicGraphError } from '../post-processed-src/classes';
 import { expect } from 'chai';
 import 'mocha';
 

@@ -22,7 +22,9 @@
   "plugins": ["@typescript-eslint", "prettier"],
   "ignorePatterns": [
     "**/tests/*.spec.ts",
-    "**/*.js"
+    "**/*.js",
+    "**/*.mjs",
+    "post-processed-src/**/*.*"
   ],
   "rules": {
     "accessor-pairs": "error",

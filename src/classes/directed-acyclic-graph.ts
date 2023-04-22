@@ -6,7 +6,8 @@ import {
 import { DirectedAcyclicGraphError } from './directed-acyclic-graph-error';
 import { DirectedAcyclicGraphErrorCode, VertexRemovalOption } from '../enums';
 import { topologicalSort } from '../assembly/topological-sort.as';
-import topologicalSortWasm from '../../build/release.wasm';
+
+const base64TopologicalSortWasm = '';
 
 export class DirectedAcyclicGraph<T = unknown> {
   static #topologicalSortWasmModule: WebAssembly.Instance | undefined;
@@ -76,8 +77,9 @@ export class DirectedAcyclicGraph<T = unknown> {
         ) => number[];
       } else if (!DirectedAcyclicGraph.#topologicalSortWasmModuleError) {
         try {
-          const wasmBytes =
-            DirectedAcyclicGraph.#base64Decode(topologicalSortWasm);
+          const wasmBytes = DirectedAcyclicGraph.#base64Decode(
+            base64TopologicalSortWasm
+          );
 
           await this.#instantiateTopologicalSortWasm(wasmBytes);
         } catch (error: unknown) {
