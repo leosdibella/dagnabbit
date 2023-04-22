@@ -1,0 +1,62 @@
+{
+  "name": "dagnabbit",
+  "version": "1.0.0",
+  "description": "Directed Acyclic Graph",
+  "main": "index.js",
+  "scripts": {
+    "as-test": "node tests/index.js",
+    "as-build:debug": "asc src/assembly/topological-sort.as.ts --target debug",
+    "as-build:release": "asc src/assembly/topological-sort.as.ts --target release",
+    "as-build": "npm run asbuild:debug && npm run asbuild:release",
+    "as-start": "npx serve .",
+    "ts-test": "env TS_NODE_COMPILER_OPTIONS='{\"module\": \"commonjs\" }' mocha -r ts-node/register -r tsconfig-paths/register 'tests/**/*.ts'",
+    "prettier:check": "prettier --check '**/*.ts'",
+    "prettier:write": "prettier --write '**/*.ts'",
+    "prettier:write:staged": "pretty-quick --staged --pattern '**/*.*(ts)'",
+    "lint": "eslint . --ext .ts",
+    "prepare": "husky install",
+    "ts-build": "tsc",
+    "ts-check": "tsc --noEmit --skipLibCheck",
+    "ts-check:diagnostics": "tsc --noEmit --skipLibCheck --extendedDiagnostics",
+    "ts-check:all": "tsc --noEmit",
+    "ts-check:all:diagnostics": "tsc --noEmit --extendedDiagnostics",
+    "wasm-to-base64": "npx rollup -p 'base64={include: \"**/*.wasm\"}' -i input.js -f es -o output.js"
+  },
+  "keywords": [
+    "DAG",
+    "Directed",
+    "Ayclic",
+    "Graph"
+  ],
+  "author": "LSD",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/chai": "^4.3.4",
+    "@types/mocha": "^10.0.1",
+    "@types/node": "^18.15.5",
+    "@typescript-eslint/eslint-plugin": "^5.56.0",
+    "@typescript-eslint/parser": "^5.56.0",
+    "assemblyscript": "^0.27.2",
+    "chai": "^4.3.7",
+    "eslint": "^8.36.0",
+    "eslint-config-prettier": "^8.8.0",
+    "eslint-plugin-prettier": "^4.2.1",
+    "husky": "^8.0.3",
+    "mocha": "^10.2.0",
+    "prettier": "^2.8.6",
+    "prettier-eslint": "^15.0.1",
+    "pretty-quick": "^3.1.3",
+    "rollup": "^3.20.7",
+    "rollup-plugin-base64": "^1.0.1",
+    "ts-node": "^10.9.1",
+    "tsconfig-paths": "^4.1.2",
+    "tslib": "^2.5.0",
+    "typescript": "^5.0.2"
+  },
+  "exports": {
+    ".": {
+      "import": "./build/release.js",
+      "types": "./build/release.d.ts"
+    }
+  }
+}
