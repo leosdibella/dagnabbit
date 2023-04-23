@@ -16,13 +16,15 @@
     "paths": {},
     "target": "ES2019",
     "typeRoots": ["node_modules/@types"],
-    "lib": ["dom", "ES2020"],
+    "lib": ["dom", "ES2020", "ES2021", "ES2022", "WebWorker"],
     "strictNullChecks": true,
     "strictPropertyInitialization": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "allowJs": true
   },
   "include": [
-    "**/*.ts"
+    "lib/**/*.ts",
+    ".lib/utils/topological-sort-wasm.js" 
   ],
   "exclude": [
     "./node_modules",

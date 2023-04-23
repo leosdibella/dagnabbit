@@ -1,4 +1,4 @@
 /node_modules
-/processed-src
-/build
+/as-build
 /dist
+/lib/utils/topological-sort-wasm.js

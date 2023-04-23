@@ -21,10 +21,11 @@
   "root": true,
   "plugins": ["@typescript-eslint", "prettier"],
   "ignorePatterns": [
-    "**/tests/*.spec.ts",
+    "**/*.spec.ts",
     "**/*.js",
     "**/*.mjs",
-    "processed-src/**/*.*"
+    "/as-build",
+    "/dist"
   ],
   "rules": {
     "accessor-pairs": "error",

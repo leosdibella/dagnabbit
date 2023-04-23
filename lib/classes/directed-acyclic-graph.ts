@@ -1,22 +1,103 @@
 import {
   IDirectedAcyclicGraphParameters,
   IVertexRemovalParameters,
-  IEdge
+  IEdge,
+  ITopologicalSortWebWorkerMessage
 } from '../interfaces';
 import { DirectedAcyclicGraphError } from './directed-acyclic-graph-error';
 import { DirectedAcyclicGraphErrorCode, VertexRemovalOption } from '../enums';
 import { topologicalSort } from '../assembly/topological-sort.as';
-
-const base64TopologicalSortWasm = '';
+import { instantiateTopologicalSortWasmModule } from '../utils/topological-sort-wasm';
 
 export class DirectedAcyclicGraph<T = unknown> {
-  static #topologicalSortWasmModule: WebAssembly.Instance | undefined;
-  static #topologicalSortWasmModuleError: DirectedAcyclicGraphError | undefined;
+  static #webWorkerId = BigInt(0);
+  static readonly #isBrowser = typeof window !== 'undefined';
 
-  static #base64Decode(base64: string) {
-    return Buffer && typeof Buffer.from === 'function'
-      ? Buffer.from(base64, 'base64')
-      : window.atob(base64);
+  static #requireWebWorkerConstrcutor() {
+    if (DirectedAcyclicGraph.#isBrowser && typeof require !== 'undefined') {
+      return undefined;
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    return require('worker_threads').Worker as typeof Worker;
+  }
+
+  static readonly #WebWorker =
+    typeof Worker === 'undefined'
+      ? DirectedAcyclicGraph.#requireWebWorkerConstrcutor()
+      : Worker;
+
+  static readonly #webWorkerOptions: WorkerOptions & { eval?: boolean } =
+    DirectedAcyclicGraph.#isBrowser
+      ? {
+          type: 'classic',
+          credentials: 'omit'
+        }
+      : {
+          eval: true
+        };
+
+  static readonly #supportsWebWorkers = !!DirectedAcyclicGraph.#WebWorker;
+  static readonly #supportsWasm = !!WebAssembly;
+  static readonly #topologicalSortNativeCode = topologicalSort.toString();
+
+  static readonly #topologicalSortWasmCode =
+    instantiateTopologicalSortWasmModule.toString();
+
+  static readonly #workerUrls: Partial<Record<string, string>> = {};
+  static #topologicalSorterWasm: ((edges: number[][]) => number[]) | undefined;
+
+  static #nativeWorker() {
+    self.onmessage = (
+      messageEvent: MessageEvent<ITopologicalSortWebWorkerMessage>
+    ) => {
+      const functionRegex = /function *\(([^()]*)\)[ \n\t]*{(.*)}/gim;
+
+      const match = functionRegex.exec(
+        messageEvent.data.topologicalSortNativeCode.replace(/\n/g, ' ')
+      );
+
+      // eslint-disable-next-line no-new-func
+      const topologicalSorter = new Function(
+        ...match![1].split(','),
+        match![2]
+      ) as (edges: number[][]) => number[];
+
+      const topologicallySorted = topologicalSorter(messageEvent.data.edges);
+
+      self.postMessage(topologicallySorted);
+    };
+  }
+
+  static #wasmWorker() {
+    self.onmessage = async (
+      messageEvent: MessageEvent<ITopologicalSortWebWorkerMessage>
+    ) => {
+      const functionRegex = /async function *\(([^()]*)\)[ \n\t]*{(.*)}/gim;
+
+      const match = functionRegex.exec(
+        messageEvent.data.topologicalSortWasmCode.replace(/\n/g, ' ')
+      );
+
+      // eslint-disable-next-line @typescript-eslint/require-await
+      const AsyncFunction = (async (_: unknown) => _).constructor;
+
+      // eslint-disable-next-line new-cap
+      const topologicalSorterFactory = AsyncFunction(
+        ...match![1].split(','),
+        match![2]
+      ) as () => Promise<{
+        topologicalSort(edges: number[][]): number[];
+      }>;
+
+      const topologicalSortModule = await topologicalSorterFactory();
+
+      const topologicallySorted = topologicalSortModule.topologicalSort(
+        messageEvent.data.edges
+      );
+
+      self.postMessage(topologicallySorted);
+    };
   }
 
   readonly #allowDuplicateVertexValues: boolean;
@@ -27,80 +108,124 @@ export class DirectedAcyclicGraph<T = unknown> {
   readonly #vertices: T[] = [];
   readonly #vertexToString: (vertex: T) => string;
   readonly #areEqualVertices: (vertex1: T, vertex2: T) => boolean;
-  readonly #isReady: Promise<void>;
+  readonly #useWasm: boolean;
+  readonly #useWebWorkers: boolean;
+  readonly #allowGracefulFallback: boolean;
 
   #topologicalSorter: ((edges: number[][]) => number[]) | undefined;
   #isVerified = false;
   #topologicallySorted?: T[];
 
-  async #instantiateTopologicalSortWasm(wasmBytes: string | Buffer) {
-    try {
-      const topologicalSortModule = await WebAssembly.instantiate(
-        wasmBytes,
-        {}
-      );
+  #createWebWorker(): Worker {
+    const workerFunction = this.#useWasm
+      ? DirectedAcyclicGraph.#supportsWasm
+        ? DirectedAcyclicGraph.#wasmWorker
+        : this.#allowGracefulFallback
+        ? DirectedAcyclicGraph.#nativeWorker
+        : undefined
+      : DirectedAcyclicGraph.#nativeWorker;
 
-      if (
-        typeof topologicalSortModule?.exports?.topologicalSort === 'function'
-      ) {
-        DirectedAcyclicGraph.#topologicalSortWasmModule = topologicalSortModule;
-
-        this.#topologicalSorter = topologicalSortModule.exports
-          .topologicalSort as (edges: number[][]) => number[];
-      }
-    } catch (error: unknown) {
-      this.#topologicalSorter = topologicalSort;
-
+    if (!workerFunction) {
       throw new DirectedAcyclicGraphError(
-        DirectedAcyclicGraphErrorCode.uninstantiableWasm,
-        'Base64 decoded WASM module could not be instantiated, falling back to native JS implementation.',
-        error instanceof Error ? error : undefined
+        DirectedAcyclicGraphErrorCode.wasmUnsupported,
+        'WASM is not supported by this platform, use { "allowGracefulFallback": true } to use the native version.'
       );
     }
 
-    if (!this.#topologicalSorter) {
-      this.#topologicalSorter = topologicalSort;
+    const workerFunctionName = workerFunction.name.replace('#', '');
+    let objectUrl = DirectedAcyclicGraph.#workerUrls[workerFunctionName];
 
-      throw new DirectedAcyclicGraphError(
-        DirectedAcyclicGraphErrorCode.missingTopologicalSortingFunction,
-        'Base64 decoded WASM module is missing exports definition for "topologicalSort", falling back to native JS implementation.'
+    if (!objectUrl) {
+      objectUrl = URL.createObjectURL(
+        new Blob([workerFunction.toString().trim()], {
+          type: 'text/javascript'
+        })
       );
+
+      DirectedAcyclicGraph.#workerUrls[workerFunctionName] = objectUrl;
     }
+
+    const webWorkerOptions: WorkerOptions = {
+      ...DirectedAcyclicGraph.#webWorkerOptions,
+      name: `DirectedAcyclicGraph-WebWorker-${workerFunctionName}-${++DirectedAcyclicGraph
+        .#webWorkerId}`
+    };
+
+    const webWorker = new DirectedAcyclicGraph.#WebWorker!(
+      objectUrl,
+      webWorkerOptions
+    );
+
+    return webWorker;
   }
 
-  async #setup(parameters: IDirectedAcyclicGraphParameters<T>) {
-    if (parameters.useWasm) {
-      if (DirectedAcyclicGraph.#topologicalSortWasmModule) {
-        this.#topologicalSorter = DirectedAcyclicGraph
-          .#topologicalSortWasmModule!.exports.topologicalSort as (
-          edges: number[][]
-        ) => number[];
-      } else if (!DirectedAcyclicGraph.#topologicalSortWasmModuleError) {
-        try {
-          const wasmBytes = DirectedAcyclicGraph.#base64Decode(
-            base64TopologicalSortWasm
-          );
+  async #topologicalSortLocal() {
+    if (!this.#topologicalSorter) {
+      this.#topologicalSorter = await this.#getTopologicalSorter();
+    }
 
-          await this.#instantiateTopologicalSortWasm(wasmBytes);
-        } catch (error: unknown) {
-          this.#topologicalSorter = topologicalSort;
+    const topologicallySorted = this.#topologicalSorter(this.edges);
 
-          DirectedAcyclicGraph.#topologicalSortWasmModuleError =
-            new DirectedAcyclicGraphError(
-              DirectedAcyclicGraphErrorCode.undecodeableWasm,
-              'Unable to decode Base64 WASM module that contains "topologicalSort", falling back to native JS implementation.',
-              error instanceof Error ? error : undefined
-            );
+    this.#topologicallySorted = topologicallySorted.map(
+      (vertexIndex) => this.#vertices[vertexIndex]
+    );
 
-          throw DirectedAcyclicGraph.#topologicalSortWasmModuleError;
+    return [...this.#topologicallySorted];
+  }
+
+  async #topologicalSortWebWorker() {
+    const webWorker = this.#createWebWorker();
+
+    webWorker.postMessage({
+      edges: this.edges,
+      topologicalSortNativeCode:
+        DirectedAcyclicGraph.#topologicalSortNativeCode,
+      topologicalSortWasmCode: DirectedAcyclicGraph.#topologicalSortWasmCode
+    } as ITopologicalSortWebWorkerMessage);
+
+    const promise = new Promise<T[]>((resolve, reject) => {
+      webWorker.onmessage = (messageEvent: MessageEvent<number[]>) => {
+        this.#topologicallySorted = messageEvent.data.map(
+          (vertexIndex) => this.#vertices[vertexIndex]
+        );
+
+        resolve([...this.#topologicallySorted]);
+      };
+
+      webWorker.onerror = (errorEvent: ErrorEvent) => {
+        reject(errorEvent.error);
+      };
+    });
+
+    promise.finally(() => {
+      webWorker.terminate();
+    });
+
+    return promise;
+  }
+
+  async #getTopologicalSorter() {
+    if (this.#useWasm) {
+      if (DirectedAcyclicGraph.#supportsWasm) {
+        if (!DirectedAcyclicGraph.#topologicalSorterWasm) {
+          const topologicalSortWasmModule =
+            await instantiateTopologicalSortWasmModule();
+
+          DirectedAcyclicGraph.#topologicalSorterWasm =
+            topologicalSortWasmModule.topologicalSort;
         }
-      } else {
-        this.#topologicalSorter = topologicalSort;
 
-        throw DirectedAcyclicGraph.#topologicalSortWasmModuleError;
+        return DirectedAcyclicGraph.#topologicalSorterWasm;
+      } else if (this.#allowGracefulFallback) {
+        return topologicalSort;
+      } else {
+        throw new DirectedAcyclicGraphError(
+          DirectedAcyclicGraphErrorCode.wasmUnsupported,
+          'WASM is not supported by this platform, use { "allowGracefulFallback": true } to use the native version.'
+        );
       }
     } else {
-      this.#topologicalSorter = topologicalSort;
+      return topologicalSort;
     }
   }
 
@@ -216,10 +341,6 @@ export class DirectedAcyclicGraph<T = unknown> {
 
   public get edges(): number[][] {
     return [...this.#edges.map((edges) => [...edges])];
-  }
-
-  public get isReady() {
-    return this.#isReady;
   }
 
   public addEdges(edges: IEdge[]) {
@@ -377,27 +498,29 @@ export class DirectedAcyclicGraph<T = unknown> {
     return vertexIndices.map((v) => this.removeVertexbyIndex(v));
   }
 
-  public topologicalSort(): T[] {
-    if (!this.#topologicalSorter) {
-      throw new DirectedAcyclicGraphError(
-        DirectedAcyclicGraphErrorCode.notReady,
-        ''
-      );
+  public async topologicalSort(): Promise<T[]> {
+    if (this.#topologicallySorted) {
+      return [...this.#topologicallySorted];
     }
 
-    if (!this.#topologicallySorted) {
-      if (!this.#isVerified) {
-        this.#verify();
+    if (!this.#isVerified) {
+      this.#verify();
+    }
+
+    if (this.#useWebWorkers) {
+      if (DirectedAcyclicGraph.#supportsWebWorkers) {
+        return this.#topologicalSortWebWorker();
+      } else if (this.#allowGracefulFallback) {
+        return this.#topologicalSortLocal();
+      } else {
+        throw new DirectedAcyclicGraphError(
+          DirectedAcyclicGraphErrorCode.webWorkersUnsupported,
+          'Web Workers are not supported by this platform, use { "allowGracefulFallback": true } to use the native version.'
+        );
       }
-
-      const topologicallySorted = this.#topologicalSorter(this.edges);
-
-      this.#topologicallySorted = topologicallySorted.map(
-        (vertexIndex) => this.#vertices[vertexIndex]
-      );
+    } else {
+      return this.#topologicalSortLocal();
     }
-
-    return [...this.#topologicallySorted];
   }
 
   public constructor(parameters: IDirectedAcyclicGraphParameters<T>) {
@@ -420,6 +543,8 @@ export class DirectedAcyclicGraph<T = unknown> {
     this.#vertexRemovalOption =
       parameters.vertexRemovalOption ?? VertexRemovalOption.first;
 
-    this.#isReady = this.#setup(parameters);
+    this.#useWebWorkers = parameters.useWebWorkers ?? false;
+    this.#useWasm = parameters.useWasm ?? false;
+    this.#allowGracefulFallback = parameters.allowGracefulFallback ?? true;
   }
 }

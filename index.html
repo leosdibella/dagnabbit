@@ -1,50 +1,106 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <script type="module">
-      import { topologicalSort } from "./build/release.js";
-
-      const graph = [
-        [1, 5],
-        [2, 6],
-        [3, 7],
-        [4, 8],
-        [13],
-        [6, 9],
-        [7],
-        [],
-        [7],
-        [10, 18],
-        [11, 14],
-        [12],
-        [8],
-        [12],
-        [15, 19],
-        [16],
-        [12, 17],
-        [13],
-        [],
-        [20],
-        [16, 21],
-        [17]
-      ];
-
-      const topologicallySorted = topologicalSort(graph);
-      const visualGraph = [];
-
-      for (let i = 0; i < graph.length; ++i) {
-        const subgraph = [];
-
-        for (let j = 0; j < graph[i]; ++j) {
-          subgraph.push(`(${i}) -> ${graph[i][j] ?? '()'}`);
-        }
-
-        visualGraph.push(subgraph);
-      }
-
-      document.body.innerText = `graph: ${visualGraph.map((sg) => sg.join()).join('\n')}, topologically sorted: ${topologicallySorted.join()}`;
-    </script>
-  </head>
   <body>
+    <h1>
+      Directed Ayclic Graph - Topological Sort Performance Comparison
+    </h1>
+    <form>
+      <div id="primary-group">
+        <label for="multiple">
+          Multiple
+        </label>
+        <input
+          id="multiple"
+          name="number-of-trials"
+          type="radio"
+        />
+        <label for="single">
+          Single
+        </label>
+        <input
+          id="single"
+          name="number-of-trials"
+          type="radio"
+        />
+      </div>
+      <div id="multiple-group">
+        <div>
+          <label for="number-of-trials">
+            Number of Trials
+          </label>
+          <input
+            id="number-of-trials"
+            type="number"
+            min="1"
+            step="1"
+            value="1"
+          />
+          <div>
+            Must be a positive integer
+          </div>
+        </div>
+      </div>
+      <div id="single-group">
+        <div>
+          <label for="randomize">
+            Random Number of Vertices
+          </label>
+          <input
+            id="randomize"
+            type="checkbox"
+            value="true"
+          />
+        </div>
+        <div>
+          <div>
+            <label for="number-of-vertices">
+              Number of Verticies
+            </label>
+            <input
+              id="number-of-vertices"
+              type="number"
+              min="1"
+              step="1"
+              value="1"
+            />
+            <div>
+              Must be a positive integer
+            </div>
+          </div>
+        </div>
+      </div>
+      <button
+        id="run"
+        type="button"
+      >
+        Run
+      </button>
+    </form>
+    <div id="results">
+      <div id="results-header">
+        <div>
+          Native JS (Main Thread)
+        </div>
+        <div>
+          Native JS (Web Worker)
+        </div>
+        <div>
+          WASM (Main Thread)
+        </div>
+        <div>
+          WASM (Web Worker)
+        </div>
+      </div>
+      <div id="results-body">
+        <ul id="number-of-vertices">
+        </ul>
+        <ul id="native-js-time">
+        </ul>
+        <ul id="wasm-time">
+        </ul>
+      </div>
+    </div>
   </body>
+  <script src="">
+  </script>
 </html>

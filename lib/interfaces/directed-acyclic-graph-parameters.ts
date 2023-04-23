@@ -8,4 +8,6 @@ export interface IDirectedAcyclicGraphParameters<T> {
   areEqualVertices?(vertex1: T, vertex2: T): boolean;
   vertexRemovalOption?: VertexRemovalOption;
   useWasm?: boolean;
+  useWebWorkers?: boolean;
+  allowGracefulFallback?: boolean;
 }

@@ -20,13 +20,14 @@
     "lib": ["dom", "ES2020"],
     "strictNullChecks": true,
     "strictPropertyInitialization": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "allowJs": true
   },
   "include": [
-    "./processed-src/**/*.ts"
+    "./lib/**/*.ts",
+    ".lib/utils/topological-sort-wasm.js" 
   ],
   "exclude": [
-    "./src",
     "./node_modules",
     "./tests"
   ]
