@@ -2,14 +2,9 @@ import * as fs from 'fs';
 
 const wasmFilePath = 'as-build/release.wasm';
 const wasmModuleFilePath = 'as-build/release.js';
-const utilsFilePath = `lib/utils`;
-const topologicalSortWasmModuleFilePath = `${utilsFilePath}/topological-sort-wasm.js`;
+const topologicalSortWasmModuleFilePath = `lib/utils/topological-sort-wasm.js`;
 
-function writeTopologicalSortWasmModuleFiles() {
-  if (!fs.existsSync(utilsFilePath)) {
-    fs.mkdirSync(utilsFilePath);
-  }
-
+function writeTopologicalSortWasmModuleFile() {
   const moduleData = fs.readFileSync(wasmModuleFilePath, 'utf8');
   const moduleDataInitializeDefintion = moduleData.split('export const {')[0];
   const base64TopologicalSortWasm = fs.readFileSync(wasmFilePath).toString('base64');
@@ -37,4 +32,4 @@ const exports = instantiatedSource.exports || (instantiatedSource.instance ? ins
   fs.writeFileSync(topologicalSortWasmModuleFilePath, rewrittenModuleData, 'utf8');
 }
 
-writeTopologicalSortWasmModuleFiles();
+writeTopologicalSortWasmModuleFile();
