@@ -2,7 +2,7 @@ import * as fs from 'fs';
 
 const wasmFilePath = 'as-build/release.wasm';
 const wasmModuleFilePath = 'as-build/release.js';
-const topologicalSortWasmModuleFilePath = `lib/utils/topological-sort-wasm.js`;
+const topologicalSortWasmModuleFilePath = `lib/utilities/topological-sort-wasm.js`;
 
 function writeTopologicalSortWasmModuleFile() {
   const moduleData = fs.readFileSync(wasmModuleFilePath, 'utf8');

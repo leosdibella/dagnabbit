@@ -14,7 +14,7 @@
     "test": "env TS_NODE_COMPILER_OPTIONS='{\"module\": \"commonjs\", \"types\": [\"assemblyscript/std/types/portable\", \"node\"] }' mocha -r ts-node/register -r tsconfig-paths/register 'tests/**/*.spec.ts'",
     "as:build:debug": "asc lib/assembly/topological-sort.as.ts --target debug",
     "as:build:release": "asc lib/assembly/topological-sort.as.ts --target release",
-    "as:build": "npm run as:build:debug && npm run as:build:release && npm run post-as-build",
+    "as:build": "npm run as:build:debug && npm run as:build:release",
     "ts:build:lib": "tsc --project tsconfig.lib.json",
     "ts:check:lib": "tsc --project tsconfig.lib.json --noEmit --skipLibCheck",
     "ts:check:diagnostics:lib": "tsc --project tsconfig.lib.json --noEmit --skipLibCheck --extendedDiagnostics",
@@ -49,7 +49,8 @@
     "ts-node": "^10.9.1",
     "tsconfig-paths": "^4.1.2",
     "tslib": "^2.5.0",
-    "typescript": "^5.0.2"
+    "typescript": "^5.0.2",
+    "webpack": "^5.80.0"
   },
   "exports": {
     ".": {

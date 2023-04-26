@@ -25,7 +25,7 @@
   },
   "include": [
     "./lib/**/*.ts",
-    ".lib/utils/topological-sort-wasm.js" 
+    ".lib/utilities/topological-sort-wasm.js" 
   ],
   "exclude": [
     "./node_modules",

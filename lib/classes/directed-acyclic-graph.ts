@@ -1,89 +1,85 @@
-import {
-  IDirectedAcyclicGraphParameters,
-  IVertexRemovalParameters,
-  IEdge
-} from '../interfaces';
+import { IEdge, IPlatformParameters } from '../interfaces';
 import { DirectedAcyclicGraphError } from './directed-acyclic-graph-error';
-import { DirectedAcyclicGraphErrorCode, VertexRemovalOption } from '../enums';
+import { DirectedAcyclicGraphErrorCode } from '../enums';
 import { topologicalSort } from '../assembly/topological-sort.as';
-import { instantiateTopologicalSortWasmModule } from '../utils/topological-sort-wasm';
-import { topologicallySortInWebWorker, platformSupport } from '../utils';
+import { instantiateTopologicalSortWasmModule } from '../utilities/topological-sort-wasm';
 
-export class DirectedAcyclicGraph<T = unknown> {
-  readonly #allowDuplicateVertexValues: boolean;
-  readonly #throwOnDuplicateVertexValue: boolean;
-  readonly #vertexRemovalOption: VertexRemovalOption;
-  readonly #shouldVerifyOnAddingEdge: boolean;
+export abstract class DirectedAcyclicGraphBase<T = unknown> {
+  static #wasmTopologicalSort: (edges: number[][]) => number[];
+
+  readonly #supportsWasm: boolean;
+  readonly #supportsWebWorkers: boolean;
   readonly #edges: number[][] = [];
   readonly #vertices: T[] = [];
-  readonly #vertexToString: (vertex: T) => string;
-  readonly #areEqualVertices: (vertex1: T, vertex2: T) => boolean;
-  readonly #useWasm: boolean;
-  readonly #useWebWorkers: boolean;
-  readonly #allowGracefulFallback: boolean;
 
-  #topologicalSorter: ((edges: number[][]) => number[]) | undefined;
-  #isVerified = false;
+  readonly #webWorkerTopologicalSort: (
+    edges: number[][],
+    useWasm: boolean
+  ) => Promise<number[]>;
+
   #topologicallySorted?: T[];
 
-  async #topologicalSortLocal() {
-    if (!this.#topologicalSorter) {
-      this.#topologicalSorter = await this.#getTopologicalSorter();
+  #initialize(vertices?: T[], edges?: number[][]) {
+    if (!vertices || !edges) {
+      return;
     }
 
-    const topologicallySorted = this.#topologicalSorter(this.edges);
-
-    this.#topologicallySorted = topologicallySorted.map(
-      (vertexIndex) => this.#vertices[vertexIndex]
-    );
-
-    return [...this.#topologicallySorted];
-  }
-
-  async #topologicalSortWebWorker() {
-    let useWasm = this.#useWasm;
-
-    if (this.#useWasm && !platformSupport.wasm) {
-      if (this.#allowGracefulFallback) {
-        useWasm = false;
-      } else {
-        throw new DirectedAcyclicGraphError(
-          DirectedAcyclicGraphErrorCode.wasmUnsupported,
-          'WASM is not supported by this platform, set allowGracefulFallback = true to fallback to the native version.'
-        );
-      }
+    if (vertices.length !== edges.length) {
+      throw new DirectedAcyclicGraphError(
+        DirectedAcyclicGraphErrorCode.vertexEdgeSetCountMismatch,
+        'The number of vertcies in the intial graph does not match the number of edge sets.'
+      );
     }
 
-    const topologicallySorted = await topologicallySortInWebWorker(
-      this.edges,
-      useWasm
-    );
+    vertices.forEach((vertex) => this.addVertex(vertex));
 
-    this.#topologicallySorted = topologicallySorted.map(
-      (vertexIndex) => this.#vertices[vertexIndex]
-    );
-
-    return [...this.#topologicallySorted];
+    edges.forEach((e, i) => {
+      e.forEach((vertexIndex) => {
+        this.addEdge({
+          fromVertexIndex: i,
+          toVertexIndex: vertexIndex
+        });
+      });
+    });
   }
 
-  async #getTopologicalSorter() {
-    if (this.#useWasm) {
-      if (platformSupport.wasm) {
+  async #topologicalSortLocal(useWasm: boolean) {
+    let topologicalSorter: (edges: number[][]) => number[];
+
+    if (useWasm && this.#supportsWasm) {
+      if (!DirectedAcyclicGraphBase.#wasmTopologicalSort) {
         const topologicalSortWasmModule =
           await instantiateTopologicalSortWasmModule();
 
-        return topologicalSortWasmModule.topologicalSort;
-      } else if (this.#allowGracefulFallback) {
-        return topologicalSort;
-      } else {
-        throw new DirectedAcyclicGraphError(
-          DirectedAcyclicGraphErrorCode.wasmUnsupported,
-          'WASM is not supported by this platform, set allowGracefulFallback = true to fallback to the native version.'
-        );
+        DirectedAcyclicGraphBase.#wasmTopologicalSort =
+          topologicalSortWasmModule.topologicalSort;
       }
+
+      topologicalSorter = DirectedAcyclicGraphBase.#wasmTopologicalSort;
     } else {
-      return topologicalSort;
+      topologicalSorter = topologicalSort;
     }
+
+    const topologicallySorted = topologicalSorter(this.edges);
+
+    this.#topologicallySorted = topologicallySorted.map(
+      (vertexIndex) => this.#vertices[vertexIndex]
+    );
+
+    return [...this.#topologicallySorted];
+  }
+
+  async #topologicalSortWebWorker(useWasm: boolean) {
+    const topologicallySorted = await this.#webWorkerTopologicalSort(
+      this.edges,
+      useWasm && this.#supportsWasm
+    );
+
+    this.#topologicallySorted = topologicallySorted.map(
+      (vertexIndex) => this.#vertices[vertexIndex]
+    );
+
+    return [...this.#topologicallySorted];
   }
 
   #verify() {
@@ -96,8 +92,6 @@ export class DirectedAcyclicGraph<T = unknown> {
 
       this.#verifyFromVertex(i).forEach(visitedVertexIndices.add);
     }
-
-    this.#isVerified = true;
   }
 
   #verifyFromVertex(startingVertexIndex: number) {
@@ -121,7 +115,7 @@ export class DirectedAcyclicGraph<T = unknown> {
             ),
           startingVertexIndex
         ]
-          .map((vi) => this.#vertexToString(this.#vertices[vi]))
+          .map((i) => `(${i})`)
           .join(' -> ');
 
         throw new DirectedAcyclicGraphError(
@@ -136,60 +130,6 @@ export class DirectedAcyclicGraph<T = unknown> {
     }
 
     return Object.keys(visitedVertexIndices).map((k) => +k);
-  }
-
-  #getVerifiedVertexRemovalIndices(
-    value: T,
-    vertexRemovalOption: VertexRemovalOption,
-    vertexRemovalIndices: number[]
-  ) {
-    const verifiedVertexRemovalOptions: number[] = [];
-
-    switch (vertexRemovalOption) {
-      case VertexRemovalOption.all:
-      case VertexRemovalOption.last: {
-        for (let i = this.#vertices.length - 1; i >= 0; --i) {
-          if (this.#areEqualVertices(this.#vertices[i], value)) {
-            verifiedVertexRemovalOptions.push(i);
-
-            if (vertexRemovalOption === VertexRemovalOption.last) {
-              break;
-            }
-          }
-        }
-
-        break;
-      }
-      case VertexRemovalOption.some: {
-        vertexRemovalIndices
-          .sort((a, b) => (a > b ? 1 : -1))
-          .forEach((vertexIndex) => {
-            if (
-              vertexIndex > -1 &&
-              this.#vertices.length > vertexIndex &&
-              this.#areEqualVertices(this.#vertices[vertexIndex], value)
-            ) {
-              verifiedVertexRemovalOptions.push(vertexIndex);
-            }
-          });
-
-        break;
-      }
-      case VertexRemovalOption.first:
-      default: {
-        const vertexIndex = this.#vertices.findIndex((vertex) =>
-          this.#areEqualVertices(vertex, value)
-        );
-
-        if (vertexIndex > -1) {
-          verifiedVertexRemovalOptions.push(vertexIndex);
-        }
-
-        break;
-      }
-    }
-
-    return verifiedVertexRemovalOptions;
   }
 
   public get vertices() {
@@ -210,26 +150,22 @@ export class DirectedAcyclicGraph<T = unknown> {
       edge.fromVertexIndex >= this.#vertices.length
     ) {
       throw new DirectedAcyclicGraphError(
-        DirectedAcyclicGraphErrorCode.invalidEdgeDefinition,
-        `The edge defined from ${edge.fromVertexIndex} to ${edge.toVertexIndex} is invalid, ${edge.fromVertexIndex} does not refer to a valid vertex`
+        DirectedAcyclicGraphErrorCode.invalidEdge,
+        `The edge (${edge.fromVertexIndex}) to (${edge.toVertexIndex}) is invalid, ${edge.fromVertexIndex} does not refer to a valid vertex`
       );
     }
 
     if (edge.toVertexIndex < 0 || edge.toVertexIndex >= this.#vertices.length) {
       throw new DirectedAcyclicGraphError(
-        DirectedAcyclicGraphErrorCode.invalidEdgeDefinition,
-        `The edge defined from ${edge.fromVertexIndex} to ${edge.toVertexIndex} is invalid, ${edge.toVertexIndex} does not refer to a valid vertex`
+        DirectedAcyclicGraphErrorCode.invalidEdge,
+        `The edge (${edge.fromVertexIndex}) -> (${edge.toVertexIndex}) is invalid, ${edge.toVertexIndex} does not refer to a valid vertex`
       );
     }
 
     if (edge.fromVertexIndex === edge.toVertexIndex) {
-      const vertexToString = this.#vertexToString(
-        this.#vertices[edge.fromVertexIndex]
-      );
-
       throw new DirectedAcyclicGraphError(
         DirectedAcyclicGraphErrorCode.cycleDetected,
-        `Cycle detected: ${vertexToString} -> ${vertexToString}`
+        `Cycle detected: (${edge.fromVertexIndex}) -> (${edge.toVertexIndex})`
       );
     }
 
@@ -237,19 +173,9 @@ export class DirectedAcyclicGraph<T = unknown> {
       (this.#edges[edge.fromVertexIndex]?.indexOf(edge.toVertexIndex) ?? -1) >
       -1;
 
-    if (hasExistingEdge) {
-      throw new DirectedAcyclicGraphError(
-        DirectedAcyclicGraphErrorCode.duplicateEdge,
-        `Duplicate edge detected from ${edge.fromVertexIndex} to ${edge.toVertexIndex}`
-      );
-    }
-
-    this.#edges[edge.fromVertexIndex].push(edge.toVertexIndex);
-    this.#topologicallySorted = undefined;
-
-    if (this.#shouldVerifyOnAddingEdge) {
-      this.#verifyFromVertex(edge.fromVertexIndex);
-      this.#isVerified = true;
+    if (!hasExistingEdge) {
+      this.#edges[edge.fromVertexIndex].push(edge.toVertexIndex);
+      this.#topologicallySorted = undefined;
     }
   }
 
@@ -260,15 +186,11 @@ export class DirectedAcyclicGraph<T = unknown> {
     if (existingEdgeIndex > -1) {
       this.#edges[edge.fromVertexIndex].splice(existingEdgeIndex, 1);
       this.#topologicallySorted = undefined;
-
-      return true;
     }
-
-    return false;
   }
 
   public removeEdges(edges: IEdge[]) {
-    return edges.map((e) => this.removeEdge(e));
+    return edges.forEach((e) => this.removeEdge(e));
   }
 
   public addVertices(values: T[]) {
@@ -276,23 +198,6 @@ export class DirectedAcyclicGraph<T = unknown> {
   }
 
   public addVertex(value: T) {
-    if (!this.#allowDuplicateVertexValues) {
-      const existingIndex = this.#vertices.findIndex((vertex) =>
-        this.#areEqualVertices(vertex, value)
-      );
-
-      if (existingIndex > -1) {
-        if (this.#throwOnDuplicateVertexValue) {
-          throw new DirectedAcyclicGraphError(
-            DirectedAcyclicGraphErrorCode.duplicateVertex,
-            `Duplicate vertex detected at ${existingIndex}`
-          );
-        }
-
-        return existingIndex;
-      }
-    }
-
     this.#vertices.push(value);
     this.#edges.push([]);
     this.#topologicallySorted = undefined;
@@ -300,35 +205,7 @@ export class DirectedAcyclicGraph<T = unknown> {
     return this.#vertices.length - 1;
   }
 
-  public removeVertexByValue(
-    vertexRemovalParameters: IVertexRemovalParameters<T>
-  ) {
-    const vertexRemovalOption =
-      vertexRemovalParameters.vertexRemovalOption ?? this.#vertexRemovalOption;
-
-    const vertexRemovalIndicies =
-      vertexRemovalParameters.vertexRemovalIndices ?? [];
-
-    const verifiedRemovalIndicies = this.#getVerifiedVertexRemovalIndices(
-      vertexRemovalParameters.value,
-      vertexRemovalOption,
-      vertexRemovalIndicies
-    );
-
-    const removedIndices = this.removeVerticesByIndices(
-      verifiedRemovalIndicies
-    );
-
-    return removedIndices.reduce((a, b) => a || b, false);
-  }
-
-  public removeVerticesByValues(
-    vertexRemovalParameters: IVertexRemovalParameters<T>[]
-  ) {
-    return vertexRemovalParameters.map((p) => this.removeVertexByValue(p));
-  }
-
-  public removeVertexbyIndex(vertexIndex: number) {
+  public removeVertex(vertexIndex: number) {
     if (vertexIndex > -1 && this.#vertices.length > vertexIndex) {
       this.#edges.splice(vertexIndex, 1);
 
@@ -351,57 +228,42 @@ export class DirectedAcyclicGraph<T = unknown> {
     return false;
   }
 
-  public removeVerticesByIndices(vertexIndices: number[]) {
-    return vertexIndices.map((v) => this.removeVertexbyIndex(v));
+  public removeVertices(vertexIndices: number[]) {
+    return vertexIndices.map((v) => this.removeVertex(v));
   }
 
-  public async topologicalSort(): Promise<T[]> {
+  public async topologicalSort(
+    useWasm = true,
+    useWebWorkers = true
+  ): Promise<T[]> {
     if (this.#topologicallySorted) {
       return [...this.#topologicallySorted];
     }
 
-    if (!this.#isVerified) {
-      this.#verify();
-    }
+    this.#verify();
 
-    if (this.#useWebWorkers) {
-      if (platformSupport.webWorkers) {
-        return this.#topologicalSortWebWorker();
-      } else if (this.#allowGracefulFallback) {
-        return this.#topologicalSortLocal();
-      } else {
-        throw new DirectedAcyclicGraphError(
-          DirectedAcyclicGraphErrorCode.webWorkersUnsupported,
-          'Web Workers are not supported by this platform, set allowGracefulFallback = true to fallabck to the native version.'
-        );
-      }
-    } else {
-      return this.#topologicalSortLocal();
-    }
+    return useWebWorkers && this.#supportsWebWorkers
+      ? this.#topologicalSortWebWorker(useWasm)
+      : this.#topologicalSortLocal(useWasm);
   }
 
-  public constructor(parameters: IDirectedAcyclicGraphParameters<T>) {
-    this.#shouldVerifyOnAddingEdge =
-      parameters.shouldVerifyOnAddingEdge ?? false;
+  public clear() {
+    this.#vertices.splice(0, this.#vertices.length);
+    this.#edges.splice(0, this.#edges.length);
+    this.#topologicallySorted = undefined;
+  }
 
-    this.#allowDuplicateVertexValues =
-      parameters.allowDuplicateVertexValues ?? false;
+  public constructor(
+    platformParameters: IPlatformParameters,
+    vertices?: T[],
+    edges?: number[][]
+  ) {
+    this.#supportsWasm = platformParameters.supportsWasm;
+    this.#supportsWebWorkers = platformParameters.supportsWebWorkers;
 
-    this.#throwOnDuplicateVertexValue =
-      parameters.throwOnDuplicateVertexValue ?? false;
+    this.#webWorkerTopologicalSort =
+      platformParameters.webWorkerTopologicalSort;
 
-    this.#vertexToString =
-      parameters.vertexToString ?? ((vertex: T) => `${vertex}`);
-
-    this.#areEqualVertices =
-      parameters.areEqualVertices ??
-      ((vertex1: T, vertex2: T) => vertex1 === vertex2);
-
-    this.#vertexRemovalOption =
-      parameters.vertexRemovalOption ?? VertexRemovalOption.first;
-
-    this.#useWebWorkers = parameters.useWebWorkers ?? false;
-    this.#useWasm = parameters.useWasm ?? false;
-    this.#allowGracefulFallback = parameters.allowGracefulFallback ?? true;
+    this.#initialize(vertices, edges);
   }
 }

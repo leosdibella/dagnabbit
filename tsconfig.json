@@ -4,7 +4,7 @@
     "noUnusedLocals": true,
     "noImplicitAny": true,
     "baseUrl": ".",
-    "outDir": "./dist/",
+    "outDir": "./ts-dist/",
     "sourceMap": true,
     "declaration": true,
     "downlevelIteration": true,
@@ -24,7 +24,7 @@
   },
   "include": [
     "lib/**/*.ts",
-    ".lib/utils/topological-sort-wasm.js" 
+    ".lib/utilities/topological-sort-wasm.js" 
   ],
   "exclude": [
     "./node_modules",

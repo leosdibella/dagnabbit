@@ -1,16 +1,12 @@
 /* eslint-disable @typescript-eslint/no-magic-numbers */
-import { DirectedAcyclicGraph, DirectedAcyclicGraphError } from '../lib/classes';
+import { DirectedAcyclicGraphError } from '../lib/classes';
+import { DirectedAcyclicGraph } from '../lib/node';
 import { expect } from 'chai';
 import 'mocha';
 
 describe('Directed Ayclic Graph', () => {
   it('should be able to use wasm inside of a web worker', async () => {
-    const dag = new DirectedAcyclicGraph<number>({
-      shouldVerifyOnAddingEdge: true,
-      useWasm: true,
-      useWebWorkers: true,
-      allowGracefulFallback: false
-    });
+    const dag = new DirectedAcyclicGraph<number>();
 
     dag.addVertices([1, 2, 3, 4, 5, 6]);
 

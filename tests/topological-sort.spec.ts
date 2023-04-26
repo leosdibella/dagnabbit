@@ -1,6 +1,6 @@
 import { expect } from 'chai';
 import 'mocha';
-import { instantiateTopologicalSortWasmModule } from '../lib/utils/topological-sort-wasm';
+import { instantiateTopologicalSortWasmModule } from '../lib/utilities/topological-sort-wasm';
 
 describe('Topological Sort', () => {
   it('should be able to topologically sort any directed acyclic graph', async () => {
