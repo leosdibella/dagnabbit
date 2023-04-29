@@ -14,4 +14,5 @@ export interface IDirectedAcyclicGraph<T> {
   clone(): IDirectedAcyclicGraph<T>;
   clear(): void;
   topologicalSort(useWasm?: boolean, useWebWorkers?: boolean): Promise<T[]>;
+  verifyAcyclic(): Promise<T[] | undefined>;
 }

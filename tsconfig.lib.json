@@ -25,7 +25,8 @@
   },
   "include": [
     "./lib/**/*.ts",
-    ".lib/utilities/topological-sort-wasm.js" 
+    "./lib/utilities/topological-sort-wasm.js",
+    "./lib/utilities/verify-acyclic-wasm.js",
   ],
   "exclude": [
     "./node_modules",

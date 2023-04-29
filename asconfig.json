@@ -1,4 +1,7 @@
 {
+  "entries": [
+    "./lib/assembly/index.ts"
+  ],
   "targets": {
     "debug": {
       "outFile": "as-build/debug.wasm",

@@ -2,3 +2,4 @@
 /as-build
 /dist
 /lib/utilities/topological-sort-wasm.js
+/lib/utilities/verify-acyclic-wasm.js

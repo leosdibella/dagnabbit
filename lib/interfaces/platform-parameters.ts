@@ -5,4 +5,8 @@ export interface IPlatformParameters {
     edges: number[][],
     useWasm: boolean
   ): Promise<number[]>;
+  webWorkerVerifyAcyclic(
+    edges: number[][],
+    useWasm: boolean
+  ): Promise<number[]>;
 }

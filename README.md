@@ -44,8 +44,10 @@ interface IDirectedAcyclicGraph<T> {
   // a deep copy of the edges defined in the graph
   readonly edges: number[][];
   // Method to add a single edge
+  // Throws an invalidEdge error if the edge cannot be added
   addEdge(edge: IEdge): void;
   // Method to add mutlople edges
+  // Throws an invalidEdge error if any edge cannot be added
   addEdges(edges: IEdge[]): void;
   // Method to remove a single edge
   removeEdge(edge: IEdge): void;
@@ -64,12 +66,16 @@ interface IDirectedAcyclicGraph<T> {
   clone(): IDirectedAcyclicGraph<T>;
   // Remove all vertices and edges
   clear(): void;
-  // Method to verify that the graph is indeed acyclic
-  verify(): boolean;
   // Sort the graph topologically
   // performs a verification step prior to sorting
   // Can use WASM and / or Web Workers, by default both are true
+  // throws a cycleDetected error if the graph is not acyclic
   topologicalSort(useWasm?: boolean, useWebWorkers?: boolean): Promise<T[]>;
+  // Vertify that the DAG is actually acyclic
+  // is checked automatically prior to any topologicalSort calls
+  // returns the first cycle found (e.g. 1, 2, 3 => 1 -> 2 -> 3 -> 1)
+  // returns an empty array if the graph is a valid DAG
+  verifyAcyclic(): Promise<T[]>;
 }
 ```
 
