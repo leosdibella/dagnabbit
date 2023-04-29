@@ -1,10 +1,10 @@
 import { expect } from 'chai';
 import 'mocha';
-import { instantiateTopologicalSortWasmModule } from '../lib/utilities/topological-sort-wasm';
+import { instantiateWasmModule } from '../lib/utilities';
 
 describe('Topological Sort', () => {
   it('should be able to topologically sort any directed acyclic graph', async () => {
-    const topologicalSortWasmModule = await instantiateTopologicalSortWasmModule();
+    const topologicalSortWasmModule = await instantiateWasmModule();
 
     const topologicalSort = topologicalSortWasmModule.topologicalSort;
 
@@ -15,25 +15,11 @@ describe('Topological Sort', () => {
     //      ^
     //      |
     //      1
-    const dag1Edges = [
-      [2],
-      [2],
-      [3, 4],
-      [5],
-      [5],
-      []
-    ];
+    const dag1Edges = [[2], [2], [3, 4], [5], [5], []];
 
     const dag1TopologicallySorted = topologicalSort(dag1Edges);
 
-    expect(dag1TopologicallySorted).to.deep.equal([
-      1,
-      0,
-      2,
-      4,
-      3,
-      5
-    ]);
+    expect(dag1TopologicallySorted).to.deep.equal([1, 0, 2, 4, 3, 5]);
 
     // 4 <-- 5 <-- 6 ----> 7
     // ^     |     ^
@@ -42,29 +28,11 @@ describe('Topological Sort', () => {
     // ^           |
     // |           |
     // 0 --------> 1
-    const dag2Edges = [
-      [1, 2],
-      [6],
-      [3, 4],
-      [],
-      [],
-      [4],
-      [5, 7],
-      []
-    ];
+    const dag2Edges = [[1, 2], [6], [3, 4], [], [], [4], [5, 7], []];
 
     const dag2TopologicallySorted = topologicalSort(dag2Edges);
 
-    expect(dag2TopologicallySorted).to.deep.equal([
-      0,
-      2,
-      3,
-      1,
-      6,
-      7,
-      5,
-      4
-    ]);
+    expect(dag2TopologicallySorted).to.deep.equal([0, 2, 3, 1, 6, 7, 5, 4]);
 
     // 18 <- 19 ---------> 20 ----> 21
     // ^     ^             |        |
@@ -111,27 +79,7 @@ describe('Topological Sort', () => {
     const dag3TopologicallySorted = topologicalSort(dag3Edges);
 
     expect(dag3TopologicallySorted).to.deep.equal([
-      0, 
-      5,
-      9,
-      18,
-      10,
-      14,
-      19,
-      20,
-      21,
-      15,
-      16,
-      17,
-      11, 
-      1,
-      6,
-      2,
-      3,
-      4,
-      13,
-      12,
-      8,
+      0, 5, 9, 18, 10, 14, 19, 20, 21, 15, 16, 17, 11, 1, 6, 2, 3, 4, 13, 12, 8,
       7
     ]);
   });

@@ -1,1 +1,1 @@
-export * from './topological-sort-wasm';
+export * from './wasm';

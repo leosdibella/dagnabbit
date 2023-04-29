@@ -1,5 +1,4 @@
 /node_modules
 /as-build
 /dist
-/lib/utilities/topological-sort-wasm.js
-/lib/utilities/verify-acyclic-wasm.js
+/lib/utilities/wasm.js

@@ -1,116 +1,134 @@
-import {
-  IDirectedAcyclicGraph,
-  IPlatformParameters,
-  ITopologicalSortWebWorkerMessage
-} from '../interfaces';
+import { IDirectedAcyclicGraph, IWebWorkerMessage } from '../interfaces';
 import { DirectedAcyclicGraphBase } from '../classes';
 import { Worker, WorkerOptions, MessagePort } from 'worker_threads';
 import { topologicalSort } from '../assembly/topological-sort.as';
-import { instantiateTopologicalSortWasmModule } from '../utilities';
-
-const topologicalSortNativeCode = topologicalSort.toString();
-const topologicalSortWasmCode = instantiateTopologicalSortWasmModule.toString();
-
-const webWorkerOptions: WorkerOptions = {
-  eval: true
-};
-
-function nativeWebWorker() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const parentPort = require('worker_threads').parentPort as MessagePort;
-
-  parentPort.on('message', (message: ITopologicalSortWebWorkerMessage) => {
-    const functionBody = message.topologicalSortNativeCode
-      .trim()
-      .replace('function topologicalSort(edges) {', '');
-
-    // eslint-disable-next-line no-new-func
-    const topologicalSorter = new Function(
-      'edges',
-      functionBody.slice(0, functionBody.length - 1)
-    ) as (edges: number[][]) => number[];
-
-    const topologicallySorted = topologicalSorter(message.edges);
-
-    parentPort.postMessage(topologicallySorted);
-  });
-}
-
-function wasmWebWorker() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const parentPort = require('worker_threads').parentPort as MessagePort;
-
-  parentPort.on('message', (message: ITopologicalSortWebWorkerMessage) => {
-    const functionBody = message.topologicalSortWasmCode
-      .trim()
-      .replace('async function instantiateTopologicalSortWasmModule() {', '');
-
-    // eslint-disable-next-line @typescript-eslint/require-await
-    const AsyncFunction = (async (_: unknown) => _).constructor;
-
-    // eslint-disable-next-line new-cap
-    const topologicalSorterFactory = AsyncFunction(
-      functionBody.slice(0, functionBody.length - 1)
-    ) as () => Promise<{
-      topologicalSort(edges: number[][]): number[];
-    }>;
-
-    topologicalSorterFactory().then((topologicalSortModule) => {
-      const topologicallySorted = topologicalSortModule.topologicalSort(
-        message.edges
-      );
-
-      parentPort.postMessage(topologicallySorted);
-    });
-  });
-}
-
-async function createTopologicalSortWebWorker(
-  edges: number[][],
-  useWasm: boolean
-) {
-  const workerFunction = useWasm ? wasmWebWorker : nativeWebWorker;
-  const webWorkerCode = `(${workerFunction.toString().trim()})()`;
-  const webWorker = new Worker(webWorkerCode, webWorkerOptions);
-
-  const promise = new Promise<number[]>((resolve, reject) => {
-    webWorker.on('message', (topologicallySorted: number[]) => {
-      resolve(topologicallySorted);
-    });
-
-    webWorker.on('error', (error) => {
-      reject(error);
-    });
-  });
-
-  webWorker.postMessage({
-    edges,
-    topologicalSortNativeCode,
-    topologicalSortWasmCode
-  } as ITopologicalSortWebWorkerMessage);
-
-  promise.finally(() => {
-    webWorker.terminate();
-  });
-
-  return promise;
-}
+import { instantiateWasmModule } from '../utilities';
+import { verifyAcyclic } from '../assembly';
+import {
+  AcyclicVerifier,
+  TopologicalSorter,
+  WebWorkerFactories
+} from '../types';
+import { WasmModuleFunctionName } from '../enums';
 
 export class DirectedAcyclicGraph<T = unknown>
   extends DirectedAcyclicGraphBase<T>
   implements IDirectedAcyclicGraph<T>
 {
-  public clone() {
-    return new DirectedAcyclicGraph(this.vertices, this.edges);
+  static {
+    this._supportsWasm = typeof WebAssembly === 'object';
+    this._supportsWebWorkers = typeof Worker === 'function';
+
+    this._webWorkerFactories = Object.freeze(
+      Object.fromEntries(
+        Object.values(WasmModuleFunctionName).map((wasmModuleFunctionName) => [
+          wasmModuleFunctionName,
+          async (edges: number[][], useWasm: boolean) =>
+            this.#createWebWorker(edges, useWasm, wasmModuleFunctionName)
+        ])
+      )
+    ) as WebWorkerFactories;
   }
 
-  constructor(vertices?: T[], edges?: number[][]) {
-    const platformParameters: IPlatformParameters = {
-      supportsWasm: typeof WebAssembly === 'object',
-      supportsWebWorkers: typeof Worker === 'function',
-      webWorkerTopologicalSort: createTopologicalSortWebWorker
+  static readonly #wasmCode = instantiateWasmModule.toString();
+
+  static readonly #nativeFunctions = Object.freeze({
+    [WasmModuleFunctionName.topologicalSort]: topologicalSort.toString(),
+    [WasmModuleFunctionName.verifyAcyclic]: verifyAcyclic.toString()
+  });
+
+  static readonly #webWorkerOptions: WorkerOptions = {
+    eval: true
+  };
+
+  static #nativeWebWorker() {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const parentPort = require('worker_threads').parentPort as MessagePort;
+
+    parentPort.on('message', (message: IWebWorkerMessage) => {
+      const functionBody = message.code
+        .trim()
+        .replace(`function ${message.wasmModuleFunctionName}(edges) {`, '');
+
+      // eslint-disable-next-line no-new-func
+      const nativeFunction = new Function(
+        'edges',
+        functionBody.slice(0, functionBody.length - 1)
+      ) as TopologicalSorter | AcyclicVerifier;
+
+      const result = nativeFunction(message.edges);
+
+      parentPort.postMessage(result);
+    });
+  }
+
+  static #wasmWebWorker() {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const parentPort = require('worker_threads').parentPort as MessagePort;
+
+    parentPort.on('message', (message: IWebWorkerMessage) => {
+      const functionBody = message.code
+        .trim()
+        .replace('async function instantiateWasmModule() {', '');
+
+      // eslint-disable-next-line @typescript-eslint/require-await
+      const AsyncFunction = (async (_: unknown) => _).constructor;
+
+      // eslint-disable-next-line new-cap
+      const wasmModuleFactory = AsyncFunction(
+        functionBody.slice(0, functionBody.length - 1)
+      ) as typeof instantiateWasmModule;
+
+      wasmModuleFactory().then((wasmModule) => {
+        const result = wasmModule[message.wasmModuleFunctionName](
+          message.edges
+        );
+
+        parentPort.postMessage(result);
+      });
+    });
+  }
+
+  static async #createWebWorker(
+    edges: number[][],
+    useWasm: boolean,
+    wasmModuleFunctionName: WasmModuleFunctionName
+  ) {
+    const workerFunction = useWasm
+      ? this.#wasmWebWorker
+      : this.#nativeWebWorker;
+
+    const webWorkerCode = `(${workerFunction.toString().trim()})()`;
+    const webWorker = new Worker(webWorkerCode, this.#webWorkerOptions);
+
+    const promise = new Promise<number[]>((resolve, reject) => {
+      webWorker.on('message', (topologicallySorted: number[]) => {
+        resolve(topologicallySorted);
+      });
+
+      webWorker.on('error', (error) => {
+        reject(error);
+      });
+    });
+
+    const webWorkerMessage: IWebWorkerMessage = {
+      edges,
+      code: useWasm
+        ? this.#wasmCode
+        : this.#nativeFunctions[wasmModuleFunctionName],
+      wasmModuleFunctionName
     };
 
-    super(platformParameters, vertices, edges);
+    webWorker.postMessage(webWorkerMessage);
+
+    promise.finally(() => {
+      webWorker.terminate();
+    });
+
+    return promise;
+  }
+
+  public clone() {
+    return new DirectedAcyclicGraph(this.vertices, this.edges);
   }
 }
