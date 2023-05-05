@@ -5,7 +5,6 @@ import { instantiateWasmModule } from '../lib/utilities';
 describe('Topological Sort', () => {
   it('should be able to topologically sort any directed acyclic graph', async () => {
     const topologicalSortWasmModule = await instantiateWasmModule();
-
     const topologicalSort = topologicalSortWasmModule.topologicalSort;
 
     //      4 ---> 5
@@ -16,7 +15,6 @@ describe('Topological Sort', () => {
     //      |
     //      1
     const dag1Edges = [[2], [2], [3, 4], [5], [5], []];
-
     const dag1TopologicallySorted = topologicalSort(dag1Edges);
 
     expect(dag1TopologicallySorted).to.deep.equal([1, 0, 2, 4, 3, 5]);
@@ -29,7 +27,6 @@ describe('Topological Sort', () => {
     // |           |
     // 0 --------> 1
     const dag2Edges = [[1, 2], [6], [3, 4], [], [], [4], [5, 7], []];
-
     const dag2TopologicallySorted = topologicalSort(dag2Edges);
 
     expect(dag2TopologicallySorted).to.deep.equal([0, 2, 3, 1, 6, 7, 5, 4]);

@@ -1,109 +1,93 @@
-import { IDirectedAcyclicGraph, IWebWorkerMessage } from '../interfaces';
+import {
+  IWebWorkerParameters,
+  IDirectedAcyclicGraph,
+  IWebWorkerMessage
+} from '../interfaces';
 import { DirectedAcyclicGraphBase } from '../classes';
 import { Worker, WorkerOptions, MessagePort } from 'worker_threads';
-import { topologicalSort } from '../assembly/topological-sort.as';
 import { instantiateWasmModule } from '../utilities';
-import { verifyAcyclic } from '../assembly';
-import {
-  AcyclicVerifier,
-  TopologicalSorter,
-  WebWorkerFactories
-} from '../types';
-import { WasmModuleFunctionName } from '../enums';
+import { WebWorkerResponse } from '../types';
+import { WasmModuleFunctionName, WebWorkerType } from '../enums';
 
 export class DirectedAcyclicGraph<T = unknown>
   extends DirectedAcyclicGraphBase<T>
   implements IDirectedAcyclicGraph<T>
 {
   static {
-    this._supportsWasm = typeof WebAssembly === 'object';
-    this._supportsWebWorkers = typeof Worker === 'function';
+    DirectedAcyclicGraphBase._supportsWasm = typeof WebAssembly === 'object';
+    DirectedAcyclicGraphBase._supportsWebWorkers = typeof Worker === 'function';
 
-    this._webWorkerFactories = Object.freeze(
-      Object.fromEntries(
-        Object.values(WasmModuleFunctionName).map((wasmModuleFunctionName) => [
-          wasmModuleFunctionName,
-          async (edges: number[][], useWasm: boolean) =>
-            this.#createWebWorker(edges, useWasm, wasmModuleFunctionName)
-        ])
-      )
-    ) as WebWorkerFactories;
+    DirectedAcyclicGraphBase._webWorkerFactory =
+      DirectedAcyclicGraph._createWebWorker;
   }
 
-  static readonly #wasmCode = instantiateWasmModule.toString();
-
-  static readonly #nativeFunctions = Object.freeze({
-    [WasmModuleFunctionName.topologicalSort]: topologicalSort.toString(),
-    [WasmModuleFunctionName.verifyAcyclic]: verifyAcyclic.toString()
-  });
-
-  static readonly #webWorkerOptions: WorkerOptions = {
+  private static readonly _webWorkerOptions: WorkerOptions = {
     eval: true
   };
 
-  static #nativeWebWorker() {
+  private static _nativeWebWorker<U extends WasmModuleFunctionName>() {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const parentPort = require('worker_threads').parentPort as MessagePort;
 
-    parentPort.on('message', (message: IWebWorkerMessage) => {
-      const functionBody = message.code
-        .trim()
-        .replace(`function ${message.wasmModuleFunctionName}(edges) {`, '');
-
+    parentPort.on('message', (message: IWebWorkerMessage<U>) => {
       // eslint-disable-next-line no-new-func
       const nativeFunction = new Function(
-        'edges',
-        functionBody.slice(0, functionBody.length - 1)
-      ) as TopologicalSorter | AcyclicVerifier;
+        ...message.webWorkerFunctionDefinition.argumentNames,
+        message.webWorkerFunctionDefinition.functionBody
+      );
 
-      const result = nativeFunction(message.edges);
+      const result = nativeFunction(...message.webWorkerArguments);
 
       parentPort.postMessage(result);
     });
   }
 
-  static #wasmWebWorker() {
+  private static _wasmWebWorker<U extends WasmModuleFunctionName>() {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const parentPort = require('worker_threads').parentPort as MessagePort;
 
-    parentPort.on('message', (message: IWebWorkerMessage) => {
-      const functionBody = message.code
-        .trim()
-        .replace('async function instantiateWasmModule() {', '');
-
+    parentPort.on('message', (message: IWebWorkerMessage<U>) => {
       // eslint-disable-next-line @typescript-eslint/require-await
       const AsyncFunction = (async (_: unknown) => _).constructor;
 
       // eslint-disable-next-line new-cap
       const wasmModuleFactory = AsyncFunction(
-        functionBody.slice(0, functionBody.length - 1)
+        message.webWorkerFunctionDefinition.functionBody
       ) as typeof instantiateWasmModule;
 
       wasmModuleFactory().then((wasmModule) => {
-        const result = wasmModule[message.wasmModuleFunctionName](
-          message.edges
-        );
+        const result = (
+          wasmModule[message.wasmModuleFunctionName] as (
+            ...args: unknown[]
+          ) => unknown
+        )(...message.webWorkerArguments);
 
         parentPort.postMessage(result);
       });
     });
   }
 
-  static async #createWebWorker(
-    edges: number[][],
-    useWasm: boolean,
-    wasmModuleFunctionName: WasmModuleFunctionName
-  ) {
-    const workerFunction = useWasm
-      ? this.#wasmWebWorker
-      : this.#nativeWebWorker;
+  private static async _createWebWorker<U extends WasmModuleFunctionName>(
+    parameters: IWebWorkerParameters<U>
+  ): Promise<WebWorkerResponse<U>> {
+    const workerFunction = parameters.useWasm
+      ? DirectedAcyclicGraph._wasmWebWorker
+      : DirectedAcyclicGraph._nativeWebWorker;
 
-    const webWorkerCode = `(${workerFunction.toString().trim()})()`;
-    const webWorker = new Worker(webWorkerCode, this.#webWorkerOptions);
+    const webWorkerType = parameters.useWasm
+      ? WebWorkerType.wasm
+      : WebWorkerType.native;
 
-    const promise = new Promise<number[]>((resolve, reject) => {
-      webWorker.on('message', (topologicallySorted: number[]) => {
-        resolve(topologicallySorted);
+    const webWorkerCode = `(function ${workerFunction.toString().trim()})()`;
+
+    const webWorker = new Worker(
+      webWorkerCode,
+      DirectedAcyclicGraph._webWorkerOptions
+    );
+
+    const promise = new Promise<WebWorkerResponse<U>>((resolve, reject) => {
+      webWorker.on('message', (response: WebWorkerResponse<U>) => {
+        resolve(response);
       });
 
       webWorker.on('error', (error) => {
@@ -111,12 +95,13 @@ export class DirectedAcyclicGraph<T = unknown>
       });
     });
 
-    const webWorkerMessage: IWebWorkerMessage = {
-      edges,
-      code: useWasm
-        ? this.#wasmCode
-        : this.#nativeFunctions[wasmModuleFunctionName],
-      wasmModuleFunctionName
+    const webWorkerMessage: IWebWorkerMessage<U> = {
+      webWorkerArguments: parameters.webWorkerArguments,
+      webWorkerFunctionDefinition:
+        this._webWorkerFunctionDefinitions[parameters.wasmModuleFunctionName][
+          webWorkerType
+        ],
+      wasmModuleFunctionName: parameters.wasmModuleFunctionName
     };
 
     webWorker.postMessage(webWorkerMessage);
@@ -129,6 +114,6 @@ export class DirectedAcyclicGraph<T = unknown>
   }
 
   public clone() {
-    return new DirectedAcyclicGraph(this.vertices, this.edges);
+    return new DirectedAcyclicGraph(this.vertices, this.outEdges);
   }
 }

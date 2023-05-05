@@ -6,10 +6,10 @@ const wasmModuleJsFilePath = `lib/utilities/wasm.js`;
 
 function writeTopologicalSortWasmModuleFile() {
   const moduleData = fs.readFileSync(wasmModuleFilePath, 'utf8');
-  const moduleDataInitializeDefintion = moduleData.split('export const {')[0];
+  const moduleDataInitializeDefinition = moduleData.split('export const {')[0];
   const base64Wasm = fs.readFileSync(wasmFilePath).toString('base64');
 
-  const rewrittenModuleData = moduleDataInitializeDefintion.replace(
+  const rewrittenModuleData = moduleDataInitializeDefinition.replace(
     'async function instantiate(module, imports = {}) {',
     `export async function instantiateWasmModule() {
   const base64Wasm = '${base64Wasm}';

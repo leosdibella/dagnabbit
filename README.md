@@ -67,13 +67,13 @@ interface IDirectedAcyclicGraph<T> {
   // Remove all vertices and edges
   clear(): void;
   // Sort the graph topologically
-  // performs a verification step prior to sorting
+  // optionally performs a verification step prior to sorting
   // Can use WASM and / or Web Workers, by default both are true
   // throws a cycleDetected error if the graph is not acyclic
-  topologicalSort(useWasm?: boolean, useWebWorkers?: boolean): Promise<T[]>;
+  topologicalSort(useWasm?: boolean, useWebWorkers?: boolean, skipVerification?: boolean): Promise<T[]>;
   // Vertify that the DAG is actually acyclic
-  // is checked automatically prior to any topologicalSort calls
-  // returns the first cycle found (e.g. 1, 2, 3 => 1 -> 2 -> 3 -> 1)
+  // can be checked automatically prior to topologicalSort
+  // returns the first cycle found (e.g. [1, 2, 3] => 1 -> 2 -> 3 -> 1)
   // returns an empty array if the graph is a valid DAG
   verifyAcyclic(): Promise<T[]>;
 }

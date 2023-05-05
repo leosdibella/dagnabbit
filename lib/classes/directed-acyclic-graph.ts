@@ -1,26 +1,71 @@
-import { IEdge, IWasmModule } from '../interfaces';
+import { IEdge, IWebWorkerFunctionDefinition } from '../interfaces';
 import { DirectedAcyclicGraphError } from './directed-acyclic-graph-error';
-import { DirectedAcyclicGraphErrorCode } from '../enums';
+import {
+  DirectedAcyclicGraphErrorCode,
+  WasmModuleFunctionName,
+  WebWorkerType
+} from '../enums';
 import { topologicalSort } from '../assembly/topological-sort.as';
 import { verifyAcyclic } from '../assembly/verify-acyclic.as';
 import { instantiateWasmModule } from '../utilities/wasm';
 import {
   AcyclicVerifier,
   TopologicalSorter,
-  WebWorkerFactories
+  WasmModule,
+  WebWorkerFactory
 } from '../types';
+import { parseFunctionDefinition } from 'lib/utilities';
 
 export abstract class DirectedAcyclicGraphBase<T = unknown> {
-  static #wasmModule: IWasmModule;
-  protected static _webWorkerFactories: WebWorkerFactories;
+  static readonly #wasmModuleInstantiationFunctionDefinition = Object.freeze(
+    parseFunctionDefinition(instantiateWasmModule)
+  );
+
+  static #wasmModule: WasmModule;
+  protected static _webWorkerFactory: WebWorkerFactory;
   protected static _supportsWasm: boolean;
   protected static _supportsWebWorkers: boolean;
 
-  readonly #edges: number[][] = [];
+  protected static readonly _webWorkerFunctionDefinitions: Readonly<
+    Record<
+      WasmModuleFunctionName,
+      Readonly<Record<WebWorkerType, Readonly<IWebWorkerFunctionDefinition>>>
+    >
+  > = Object.freeze({
+    [WasmModuleFunctionName.topologicalSort]: Object.freeze({
+      [WebWorkerType.native]: Object.freeze(
+        parseFunctionDefinition(topologicalSort)
+      ),
+      [WebWorkerType.wasm]: this.#wasmModuleInstantiationFunctionDefinition
+    }),
+    [WasmModuleFunctionName.verifyAcyclic]: Object.freeze({
+      [WebWorkerType.native]: Object.freeze(
+        parseFunctionDefinition(verifyAcyclic)
+      ),
+      [WebWorkerType.wasm]: this.#wasmModuleInstantiationFunctionDefinition
+    })
+  });
+
+  readonly #inEdges: number[][] = [];
+  readonly #outEdges: number[][] = [];
   readonly #vertices: T[] = [];
 
-  #acyclicVerification?: T[];
+  #cycleVertexIndex?: number;
   #topologicallySorted?: T[];
+
+  static #removeVertexEdges(vertexIndex: number, edges: number[][]) {
+    edges.splice(vertexIndex, 1);
+
+    edges.forEach((vertices) => {
+      const existingEdgeIndex = vertices.findIndex(
+        (vertex) => vertex === vertexIndex
+      );
+
+      if (existingEdgeIndex > -1) {
+        edges.splice(existingEdgeIndex, 1);
+      }
+    });
+  }
 
   #initialize(vertices?: T[], edges?: number[][]) {
     if (!vertices || !edges) {
@@ -59,27 +104,23 @@ export abstract class DirectedAcyclicGraphBase<T = unknown> {
       acyclicVerifier = verifyAcyclic;
     }
 
-    const acyclicVerification = acyclicVerifier(this.edges);
+    this.#cycleVertexIndex = acyclicVerifier(this.outEdges, this.#inEdges);
 
-    this.#acyclicVerification = acyclicVerification.map(
-      (vertexIndex) => this.#vertices[vertexIndex]
-    );
-
-    return [...this.#acyclicVerification];
+    return this.#cycleVertexIndex > -1
+      ? this.#vertices[this.#cycleVertexIndex]
+      : undefined;
   }
 
   async #verifyAcyclicWebWorker(useWasm: boolean) {
-    const acyclicVerification =
-      await DirectedAcyclicGraphBase._webWorkerFactories.verifyAcyclic(
-        this.edges,
-        useWasm && DirectedAcyclicGraphBase._supportsWasm
-      );
+    this.#cycleVertexIndex = await DirectedAcyclicGraphBase._webWorkerFactory({
+      webWorkerArguments: [this.outEdges, this.#inEdges],
+      wasmModuleFunctionName: WasmModuleFunctionName.verifyAcyclic,
+      useWasm: useWasm && DirectedAcyclicGraphBase._supportsWasm
+    });
 
-    this.#acyclicVerification = acyclicVerification.map(
-      (vertexIndex) => this.#vertices[vertexIndex]
-    );
-
-    return [...this.#acyclicVerification];
+    return this.#cycleVertexIndex > -1
+      ? this.#vertices[this.#cycleVertexIndex]
+      : undefined;
   }
 
   async #topologicalSortLocal(useWasm: boolean) {
@@ -95,7 +136,7 @@ export abstract class DirectedAcyclicGraphBase<T = unknown> {
       topologicalSorter = topologicalSort;
     }
 
-    const topologicallySorted = topologicalSorter(this.edges);
+    const topologicallySorted = topologicalSorter(this.outEdges);
 
     this.#topologicallySorted = topologicallySorted.map(
       (vertexIndex) => this.#vertices[vertexIndex]
@@ -106,10 +147,11 @@ export abstract class DirectedAcyclicGraphBase<T = unknown> {
 
   async #topologicalSortWebWorker(useWasm: boolean) {
     const topologicallySorted =
-      await DirectedAcyclicGraphBase._webWorkerFactories.topologicalSort(
-        this.edges,
-        useWasm && DirectedAcyclicGraphBase._supportsWasm
-      );
+      await DirectedAcyclicGraphBase._webWorkerFactory({
+        wasmModuleFunctionName: WasmModuleFunctionName.topologicalSort,
+        useWasm: useWasm && DirectedAcyclicGraphBase._supportsWasm,
+        webWorkerArguments: [this.outEdges]
+      });
 
     this.#topologicallySorted = topologicallySorted.map(
       (vertexIndex) => this.#vertices[vertexIndex]
@@ -122,18 +164,23 @@ export abstract class DirectedAcyclicGraphBase<T = unknown> {
     return [...this.#vertices];
   }
 
-  public get edges(): number[][] {
-    return [...this.#edges.map((edges) => [...edges])];
+  public get outEdges(): number[][] {
+    return [...this.#outEdges.map((edges) => [...edges])];
   }
 
-  public addEdges(edges: IEdge[]) {
-    return edges.forEach((e) => this.addEdge(e));
+  public get inEdges(): number[][] {
+    return [...this.#inEdges.map((edges) => [...edges])];
   }
 
-  public addEdge(edge: IEdge) {
+  public addEdges(edges: IEdge[], suppressExceptions = false) {
+    return edges.forEach((e) => this.addEdge(e, suppressExceptions));
+  }
+
+  public addEdge(edge: IEdge, suppressExceptions = false) {
     if (
-      edge.fromVertexIndex < 0 ||
-      edge.fromVertexIndex >= this.#vertices.length
+      !suppressExceptions &&
+      (edge.fromVertexIndex < 0 ||
+        edge.fromVertexIndex >= this.#vertices.length)
     ) {
       throw new DirectedAcyclicGraphError(
         DirectedAcyclicGraphErrorCode.invalidEdge,
@@ -141,39 +188,45 @@ export abstract class DirectedAcyclicGraphBase<T = unknown> {
       );
     }
 
-    if (edge.toVertexIndex < 0 || edge.toVertexIndex >= this.#vertices.length) {
+    if (
+      !suppressExceptions &&
+      (edge.toVertexIndex < 0 || edge.toVertexIndex >= this.#vertices.length)
+    ) {
       throw new DirectedAcyclicGraphError(
         DirectedAcyclicGraphErrorCode.invalidEdge,
         `The edge (${edge.fromVertexIndex}) -> (${edge.toVertexIndex}) is invalid, ${edge.toVertexIndex} does not refer to a valid vertex`
       );
     }
 
-    if (edge.fromVertexIndex === edge.toVertexIndex) {
-      throw new DirectedAcyclicGraphError(
-        DirectedAcyclicGraphErrorCode.cycleDetected,
-        `Cycle detected: (${edge.fromVertexIndex}) -> (${edge.toVertexIndex})`
-      );
-    }
-
     const hasExistingEdge =
-      (this.#edges[edge.fromVertexIndex]?.indexOf(edge.toVertexIndex) ?? -1) >
-      -1;
+      (this.#outEdges[edge.fromVertexIndex]?.indexOf(edge.toVertexIndex) ??
+        -1) > -1;
 
     if (!hasExistingEdge) {
-      this.#edges[edge.fromVertexIndex].push(edge.toVertexIndex);
+      this.#outEdges[edge.fromVertexIndex].push(edge.toVertexIndex);
+      this.#inEdges[edge.toVertexIndex].push(edge.fromVertexIndex);
       this.#topologicallySorted = undefined;
-      this.#acyclicVerification = undefined;
+      this.#cycleVertexIndex = undefined;
+    } else if (!suppressExceptions) {
+      throw new DirectedAcyclicGraphError(
+        DirectedAcyclicGraphErrorCode.duplicateEdge,
+        `The edge (${edge.fromVertexIndex}) -> (${edge.toVertexIndex}) already exists.`
+      );
     }
   }
 
   public removeEdge(edge: IEdge) {
-    const existingEdgeIndex =
-      this.#edges[edge.fromVertexIndex]?.indexOf(edge.toVertexIndex) ?? -1;
+    const existingOutEdgeIndex =
+      this.#outEdges[edge.fromVertexIndex]?.indexOf(edge.toVertexIndex) ?? -1;
 
-    if (existingEdgeIndex > -1) {
-      this.#edges[edge.fromVertexIndex].splice(existingEdgeIndex, 1);
+    const existingInEdgeIndex =
+      this.#inEdges[edge.toVertexIndex]?.indexOf(edge.fromVertexIndex) ?? -1;
+
+    if (existingOutEdgeIndex > -1 && existingInEdgeIndex > -1) {
+      this.#outEdges[edge.fromVertexIndex].splice(existingOutEdgeIndex, 1);
+      this.#inEdges[edge.toVertexIndex].splice(existingInEdgeIndex, 1);
       this.#topologicallySorted = undefined;
-      this.#acyclicVerification = undefined;
+      this.#cycleVertexIndex = undefined;
     }
   }
 
@@ -187,44 +240,31 @@ export abstract class DirectedAcyclicGraphBase<T = unknown> {
 
   public addVertex(value: T) {
     this.#vertices.push(value);
-    this.#edges.push([]);
+    this.#outEdges.push([]);
+    this.#inEdges.push([]);
     this.#topologicallySorted = undefined;
-    this.#acyclicVerification = undefined;
+    this.#cycleVertexIndex = undefined;
 
     return this.#vertices.length - 1;
   }
 
   public removeVertex(vertexIndex: number) {
     if (vertexIndex > -1 && this.#vertices.length > vertexIndex) {
-      this.#edges.splice(vertexIndex, 1);
-
-      this.#edges.forEach((edges) => {
-        const existingEdgeIndex = edges.findIndex(
-          (edge) => edge === vertexIndex
-        );
-
-        if (existingEdgeIndex > -1) {
-          edges.splice(existingEdgeIndex, 1);
-        }
-      });
-
+      DirectedAcyclicGraphBase.#removeVertexEdges(vertexIndex, this.#outEdges);
+      DirectedAcyclicGraphBase.#removeVertexEdges(vertexIndex, this.#inEdges);
       this.#vertices.splice(vertexIndex, 1);
       this.#topologicallySorted = undefined;
-      this.#acyclicVerification = undefined;
-
-      return true;
+      this.#cycleVertexIndex = undefined;
     }
-
-    return false;
   }
 
   public removeVertices(vertexIndices: number[]) {
-    return vertexIndices.map((v) => this.removeVertex(v));
+    return vertexIndices.forEach((v) => this.removeVertex(v));
   }
 
   public async verifyAcyclic(useWasm = true, useWebWorkers = true) {
-    if (this.#acyclicVerification) {
-      return [...this.#acyclicVerification];
+    if (this.#cycleVertexIndex !== undefined && this.#cycleVertexIndex > -1) {
+      return this.#vertices[this.#cycleVertexIndex];
     }
 
     return useWebWorkers && DirectedAcyclicGraphBase._supportsWebWorkers
@@ -234,21 +274,24 @@ export abstract class DirectedAcyclicGraphBase<T = unknown> {
 
   public async topologicalSort(
     useWasm = true,
-    useWebWorkers = true
+    useWebWorkers = true,
+    skipVerification = false
   ): Promise<T[]> {
     if (this.#topologicallySorted) {
       return [...this.#topologicallySorted];
     }
 
-    this.verifyAcyclic();
+    if (!skipVerification) {
+      await this.verifyAcyclic(useWasm, useWebWorkers);
 
-    if (this.#acyclicVerification) {
-      throw new DirectedAcyclicGraphError(
-        DirectedAcyclicGraphErrorCode.cycleDetected,
-        `Cycle detected: ${this.#acyclicVerification
-          .map((vertexIndex) => `(${vertexIndex})`)
-          .join(' -> ')}`
-      );
+      if (this.#cycleVertexIndex! > -1) {
+        throw new DirectedAcyclicGraphError(
+          DirectedAcyclicGraphErrorCode.cycleDetected,
+          `Cycle detected containing vertex with index: ${
+            this.#cycleVertexIndex
+          }`
+        );
+      }
     }
 
     return useWebWorkers && DirectedAcyclicGraphBase._supportsWebWorkers
@@ -258,9 +301,10 @@ export abstract class DirectedAcyclicGraphBase<T = unknown> {
 
   public clear() {
     this.#vertices.splice(0, this.#vertices.length);
-    this.#edges.splice(0, this.#edges.length);
+    this.#outEdges.splice(0, this.#outEdges.length);
+    this.#inEdges.splice(0, this.#inEdges.length);
     this.#topologicallySorted = undefined;
-    this.#acyclicVerification = undefined;
+    this.#cycleVertexIndex = undefined;
   }
 
   public constructor(vertices?: T[], edges?: number[][]) {
