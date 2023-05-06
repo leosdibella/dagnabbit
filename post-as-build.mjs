@@ -15,7 +15,9 @@ function writeWasmModuleFile() {
   const base64Wasm = '${base64Wasm}';
   const imports = {};
   function base64ToArrayBuffer(base64) {
-    const binaryString = atob(base64);
+    const binaryString = typeof atob === 'function'
+      ? atob(base64)
+      : Buffer.from(base64, 'base64').toString('binary');
     const bytes = new Uint8Array(binaryString.length);
     for (let i = 0; i < binaryString.length; ++i) {
         bytes[i] = binaryString.charCodeAt(i);

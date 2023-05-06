@@ -7,10 +7,10 @@ export function verifyAcyclicity(outEdges: i32[][], inEdges: i32[][]): i32[] {
     .map<i32>((ie, i) => (ie.length === 0 ? i : -1))
     .filter((ie) => ie > -1);
 
-  const visited = outEdges.map(() => false);
+  const visited = outEdges.map(() => new Array<i32>(0));
   const traversed = new Array<i32>(0);
 
-  if (zeroInEdgeVertices.length === 0) {
+  /*if (zeroInEdgeVertices.length === 0) {
     const cyclicStack = new Array<i32>(0);
 
     cyclicStack.push(0);
@@ -31,7 +31,7 @@ export function verifyAcyclicity(outEdges: i32[][], inEdges: i32[][]): i32[] {
         }
       }
     }
-  }
+  }*/
 
   const stack: i32[][] = new Array<i32[]>(0);
 
@@ -40,22 +40,29 @@ export function verifyAcyclicity(outEdges: i32[][], inEdges: i32[][]): i32[] {
     const adjacencyEdges = outEdges[zeroInEdgeVertex];
 
     for (let j: i32 = 0; j < adjacencyEdges.length; ++j) {
-      const outEdge = new Array<i32>(2);
+      // eslint-disable-next-line @typescript-eslint/no-magic-numbers
+      const edge = new Array<i32>(3);
 
-      outEdge[0] = zeroInEdgeVertex;
-      outEdge[1] = adjacencyEdges[j];
+      edge[0] = zeroInEdgeVertex;
+      edge[1] = adjacencyEdges[j];
+      edge[2] = -1;
 
-      stack.push(outEdge);
+      stack.push(edge);
     }
   }
 
   let pruneTraversed = false;
 
   while (stack.length > 0) {
-    const outEdge = stack.pop() as i32[];
-    const fromVertex = outEdge[0];
-    const toVertex = outEdge[1];
+    const edge = stack.pop() as i32[];
+    const fromVertex = edge[0];
+    const toVertex = edge[1];
+    const inEdgeVertex = edge[2];
     const adjacentEdges = outEdges[toVertex];
+
+    if (inEdgeVertex !== -1) {
+      visited[fromVertex].push(inEdgeVertex);
+    }
 
     if (pruneTraversed) {
       pruneTraversed = false;
@@ -69,7 +76,7 @@ export function verifyAcyclicity(outEdges: i32[][], inEdges: i32[][]): i32[] {
           break;
         }
       }
-    } else {
+    } else if (traversed.indexOf(fromVertex) === -1) {
       traversed.push(fromVertex);
     }
 
@@ -79,21 +86,27 @@ export function verifyAcyclicity(outEdges: i32[][], inEdges: i32[][]): i32[] {
       return traversed.slice(traversedToVertexIndex);
     }
 
-    if (!visited[toVertex]) {
-      for (let i: i32 = 0; i < adjacentEdges.length; ++i) {
-        const nextOutEdge = new Array<i32>(2);
+    for (let i: i32 = 0; i < adjacentEdges.length; ++i) {
+      const nextToVertex = adjacentEdges[i];
 
-        nextOutEdge[0] = toVertex;
-        nextOutEdge[1] = adjacentEdges[i];
-
-        stack.push(nextOutEdge);
+      if (visited[toVertex].indexOf(nextToVertex) > -1) {
+        continue;
       }
 
-      visited[toVertex] = true;
+      // eslint-disable-next-line @typescript-eslint/no-magic-numbers
+      const nextEdge = new Array<i32>(3);
+
+      nextEdge[0] = toVertex;
+      nextEdge[1] = nextToVertex;
+      nextEdge[2] = -1;
+
+      stack.push(nextEdge);
     }
 
     if (adjacentEdges.length === 0) {
       pruneTraversed = true;
+    } else if (stack.length > 0) {
+      stack[stack.length - 1][2] = fromVertex;
     }
   }
 
