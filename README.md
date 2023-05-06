@@ -39,20 +39,22 @@ Interface
 
 ```typescript
 interface IDirectedAcyclicGraph<T> {
-  // a copy of the vertices defined in the graph
+  // A shallow copy of the vertices defined in the graph
   readonly vertices: T[];
-  // a deep copy of the edges defined in the graph
+  // A deep copy of the edges defined in the graph
   readonly edges: number[][];
-  // Method to add a single edge
-  // Throws an invalidEdge error if the edge cannot be added
-  addEdge(edge: IEdge): void;
-  // Method to add mutlople edges
-  // Throws an invalidEdge error if any edge cannot be added
-  addEdges(edges: IEdge[]): void;
-  // Method to remove a single edge
-  removeEdge(edge: IEdge): void;
-  // Method to remove multiple edges
-  removeEdges(edges: IEdge[]): void;
+  tryAddEdge(edge: [number, number]): boolean;
+  // Will throw exceptions for invalid edge deifnitions
+  addEdge(edge: [number, number]): void;
+  tryAddEdges(edges: [number, number][]): boolean[];
+  // Will throw exceptions for invalid edge deifnitions
+  addEdges(edges: [number, number][]): void;
+  tryRemoveEdge(edge: [number, number]): boolean;
+  // Will throw exceptions for invalid edge deifnitions
+  removeEdge(edge: [number, number]): void;
+  tryRemoveEdges(edges: [number, number][]): boolean[];
+  // Will throw exceptions for invalid edge deifnitions
+  removeEdges(edges: [number, number][]): void;
   // Method to add a single vertex
   addVertex(value: T): number;
   // Method to add multiple vertices
@@ -66,16 +68,17 @@ interface IDirectedAcyclicGraph<T> {
   clone(): IDirectedAcyclicGraph<T>;
   // Remove all vertices and edges
   clear(): void;
-  // Sort the graph topologically
-  // optionally performs a verification step prior to sorting
-  // Can use WASM and / or Web Workers, by default both are true
-  // throws a cycleDetected error if the graph is not acyclic
+  /** Sort the DAG topologically,
+   * optionally executes via WASM
+   * optionally executes via WebWorkers
+   * optionally performs an acyclic verification step prior to sorting
+   * in which case a will a cycleDetected error if the graph is not acyclic */
   topologicalSort(useWasm?: boolean, useWebWorkers?: boolean, skipVerification?: boolean): Promise<T[]>;
   // Vertify that the DAG is actually acyclic
   // can be checked automatically prior to topologicalSort
   // returns the first cycle found (e.g. [1, 2, 3] => 1 -> 2 -> 3 -> 1)
   // returns an empty array if the graph is a valid DAG
-  verifyAcyclic(): Promise<T[]>;
+  verifyAcyclicity(useWasm?: boolean, useWebWorkers?: boolean): Promise<T[]>;
 }
 ```
 

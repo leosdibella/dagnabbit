@@ -1,7 +1,8 @@
 import {
   IWebWorkerParameters,
   IDirectedAcyclicGraph,
-  IWebWorkerMessage
+  IWebWorkerMessage,
+  IDirectedAcyclicGraphParameters
 } from '../interfaces';
 import { DirectedAcyclicGraphBase } from '../classes';
 import { Worker, WorkerOptions, MessagePort } from 'worker_threads';
@@ -21,7 +22,7 @@ export class DirectedAcyclicGraph<T = unknown>
       DirectedAcyclicGraph._createWebWorker;
   }
 
-  private static readonly _webWorkerOptions: WorkerOptions = {
+  private static readonly _webWorkerOptions: Readonly<WorkerOptions> = {
     eval: true
   };
 
@@ -113,7 +114,17 @@ export class DirectedAcyclicGraph<T = unknown>
     return promise;
   }
 
-  public clone() {
-    return new DirectedAcyclicGraph(this.vertices, this.outEdges);
+  public clone(
+    parameters?: Omit<IDirectedAcyclicGraphParameters<T>, 'vertices' | 'edges'>
+  ) {
+    return new DirectedAcyclicGraph({
+      ...(parameters ?? {
+        vertexCardinalityWasmThreshold: this.vertexCardinalityWasmThreshold,
+        vertexCardinalityWebWorkerThreshold:
+          this.vertexCardinalityWebWorkerThreshold
+      }),
+      vertices: this.vertices,
+      edges: this.edges
+    });
   }
 }

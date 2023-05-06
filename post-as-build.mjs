@@ -4,7 +4,7 @@ const wasmFilePath = 'as-build/release.wasm';
 const wasmModuleFilePath = 'as-build/release.js';
 const wasmModuleJsFilePath = `lib/utilities/wasm.js`;
 
-function writeTopologicalSortWasmModuleFile() {
+function writeWasmModuleFile() {
   const moduleData = fs.readFileSync(wasmModuleFilePath, 'utf8');
   const moduleDataInitializeDefinition = moduleData.split('export const {')[0];
   const base64Wasm = fs.readFileSync(wasmFilePath).toString('base64');
@@ -32,4 +32,4 @@ const exports = instantiatedSource.exports || (instantiatedSource.instance ? ins
   fs.writeFileSync(wasmModuleJsFilePath, rewrittenModuleData, 'utf8');
 }
 
-writeTopologicalSortWasmModuleFile();
+writeWasmModuleFile();

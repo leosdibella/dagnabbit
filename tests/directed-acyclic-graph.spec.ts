@@ -4,12 +4,33 @@ import { DirectedAcyclicGraph } from '../lib/node';
 import { expect } from 'chai';
 import 'mocha';
 
+const defaultDagVertices = [0, 1, 2, 3, 4, 5];
+
+const defaultDagEdges: [number, number][] = [
+  [0, 2],
+  [1, 2],
+  [2, 3],
+  [2, 4],
+  [3, 5],
+  [4, 5]
+];
+
+const defaultCyclicEdges: [number, number][] = [
+  [0, 2],
+  [1, 2],
+  [2, 3],
+  [2, 4],
+  [3, 5],
+  [4, 5],
+  [5, 3]
+];
+
 describe('Directed Acyclic Graph', () => {
   it('should be able to use wasm inside of a web worker', async () => {
-    const dag = new DirectedAcyclicGraph<number>(
-      [0, 1, 2, 3, 4, 5],
-      [[2], [2], [3, 4], [5], [5], []]
-    );
+    const dag = new DirectedAcyclicGraph<number>({
+      vertices: defaultDagVertices,
+      edges: defaultDagEdges
+    });
 
     const topologicallySorted = await dag.topologicalSort(true, true);
 
@@ -17,10 +38,10 @@ describe('Directed Acyclic Graph', () => {
   });
 
   it('should be able to use native code inside of a web worker', async () => {
-    const dag = new DirectedAcyclicGraph<number>(
-      [0, 1, 2, 3, 4, 5],
-      [[2], [2], [3, 4], [5], [5], []]
-    );
+    const dag = new DirectedAcyclicGraph<number>({
+      vertices: defaultDagVertices,
+      edges: defaultDagEdges
+    });
 
     const topologicallySorted = await dag.topologicalSort(false, true);
 
@@ -28,10 +49,10 @@ describe('Directed Acyclic Graph', () => {
   });
 
   it('should be able to use wasm in the main thread', async () => {
-    const dag = new DirectedAcyclicGraph<number>(
-      [0, 1, 2, 3, 4, 5],
-      [[2], [2], [3, 4], [5], [5], []]
-    );
+    const dag = new DirectedAcyclicGraph<number>({
+      vertices: defaultDagVertices,
+      edges: defaultDagEdges
+    });
 
     const topologicallySorted = await dag.topologicalSort(true, false);
 
@@ -39,10 +60,10 @@ describe('Directed Acyclic Graph', () => {
   });
 
   it('should be able to use native code in the main thread', async () => {
-    const dag = new DirectedAcyclicGraph<number>(
-      [0, 1, 2, 3, 4, 5],
-      [[2], [2], [3, 4], [5], [5], []]
-    );
+    const dag = new DirectedAcyclicGraph<number>({
+      vertices: defaultDagVertices,
+      edges: defaultDagEdges
+    });
 
     const topologicallySorted = await dag.topologicalSort(false, false);
 
@@ -55,86 +76,45 @@ describe('Directed Acyclic Graph', () => {
 
     expect(vertexIndex).to.equal(0);
 
-    const vertexIndices = dag.addVertices([1, 2, 3, 4]);
+    const vertexIndices = dag.addVertices([1, 2, 3, 4, 5]);
 
     expect(vertexIndices[0]).to.equal(1);
     expect(vertexIndices[1]).to.equal(2);
     expect(vertexIndices[2]).to.equal(3);
     expect(vertexIndices[3]).to.equal(4);
-    expect(dag.vertices.length).to.equal(5);
+    expect(vertexIndices[4]).to.equal(5);
+    expect(dag.vertices.length).to.equal(6);
 
-    dag.addEdge({
-      fromVertexIndex: 0,
-      toVertexIndex: 1
-    });
+    dag.addEdge([0, 2]);
 
-    expect(dag.outEdges.length).to.equal(5);
-    expect(dag.outEdges[0]).to.deep.equal([1]);
+    expect(dag.edges.length).to.equal(1);
+    expect(dag.edges[0]).to.deep.equal([0, 2]);
 
     dag.addEdges([
-      {
-        fromVertexIndex: 1,
-        toVertexIndex: 2
-      },
-      {
-        fromVertexIndex: 1,
-        toVertexIndex: 3
-      }
+      [1, 2],
+      [2, 3],
+      [2, 4],
+      [3, 5],
+      [4, 5]
     ]);
 
-    expect(dag.outEdges.length).to.equal(5);
-    expect(dag.outEdges[1]).to.deep.equal([2, 3]);
+    expect(dag.edges.length).to.equal(6);
+    expect(dag.edges[1]).to.deep.equal([1, 2]);
+    expect(dag.edges[2]).to.deep.equal([2, 3]);
+    expect(dag.edges[3]).to.deep.equal([2, 4]);
+    expect(dag.edges[4]).to.deep.equal([3, 5]);
+    expect(dag.edges[5]).to.deep.equal([4, 5]);
   });
 
-  it('should be able to verify if a graph has cycles or not, using wasm inside a web worker', async () => {
-    const dag = new DirectedAcyclicGraph<number>(
-      [0, 1, 2, 3, 4, 5],
-      [[2], [2], [3, 4], [5], [5], [3]]
-    );
+  it('should be able to detect cycles, using wasm inside a web worker', async () => {
+    const dag = new DirectedAcyclicGraph<number>({
+      vertices: defaultDagVertices,
+      edges: defaultCyclicEdges
+    });
 
-    const cycleVertexIndex = await dag.verifyAcyclic(true, true);
+    const cycleDetected = await dag.verifyAcyclicity(true, true);
 
-    expect(cycleVertexIndex).to.equal(5);
-  });
-
-  it('should be able to verify if a graph has cycles or not, using native code inside a web worker', async () => {
-    const dag = new DirectedAcyclicGraph<number>(
-      [0, 1, 2, 3, 4, 5],
-      [[2], [2], [3, 4], [5], [5], [3]]
-    );
-
-    const cycleVertexIndex = await dag.verifyAcyclic(false, true);
-
-    expect(cycleVertexIndex).to.equal(5);
-  });
-
-  it('should be able to verify if a graph has cycles or not, using wasm in the main thread', async () => {
-    const dag = new DirectedAcyclicGraph<number>(
-      [0, 1, 2, 3, 4, 5],
-      [[2], [2], [3, 4], [5], [5], [3]]
-    );
-
-    const cycleVertexIndex = await dag.verifyAcyclic(true, false);
-
-    expect(cycleVertexIndex).to.equal(5);
-  });
-
-  it('should be able to verify if a graph has cycles or not, using native code in the main thread', async () => {
-    const dag = new DirectedAcyclicGraph<number>(
-      [0, 1, 2, 3, 4, 5],
-      [[2], [2], [3, 4], [5], [5], [3]]
-    );
-
-    const cycleVertexIndex = await dag.verifyAcyclic(false, false);
-
-    expect(cycleVertexIndex).to.equal(5);
-  });
-
-  it('should be able to detect cycles using wasm inside of a web worker', async () => {
-    const dag = new DirectedAcyclicGraph<number>(
-      [0, 1, 2, 3, 4, 5],
-      [[2], [2], [3, 4], [5], [5], [3]]
-    );
+    expect(cycleDetected).to.deep.equal([5, 3]);
 
     try {
       await dag.topologicalSort(true, true);
@@ -143,24 +123,15 @@ describe('Directed Acyclic Graph', () => {
     }
   });
 
-  it('should be able to detect cycles using wasm in the main thread', async () => {
-    const dag = new DirectedAcyclicGraph<number>(
-      [0, 1, 2, 3, 4, 5],
-      [[2], [2], [3, 4], [5], [5], [3]]
-    );
+  it('should be able to detect cycles, using native code inside a web worker', async () => {
+    const dag = new DirectedAcyclicGraph<number>({
+      vertices: defaultDagVertices,
+      edges: defaultCyclicEdges
+    });
 
-    try {
-      await dag.topologicalSort(true, false);
-    } catch (e: unknown) {
-      expect(e instanceof DirectedAcyclicGraphError).to.be.true;
-    }
-  });
+    const cycleDetected = await dag.verifyAcyclicity(false, true);
 
-  it('should be able to detect cycles using native code in a web worker', async () => {
-    const dag = new DirectedAcyclicGraph<number>(
-      [0, 1, 2, 3, 4, 5],
-      [[2], [2], [3, 4], [5], [5], [3]]
-    );
+    expect(cycleDetected).to.deep.equal([5, 3]);
 
     try {
       await dag.topologicalSort(false, true);
@@ -169,11 +140,32 @@ describe('Directed Acyclic Graph', () => {
     }
   });
 
-  it('should be able to detect cycles using native code in the main thread', async () => {
-    const dag = new DirectedAcyclicGraph<number>(
-      [0, 1, 2, 3, 4, 5],
-      [[2], [2], [3, 4], [5], [5], [3]]
-    );
+  it('should be able to detect cycles, using wasm in the main thread', async () => {
+    const dag = new DirectedAcyclicGraph<number>({
+      vertices: defaultDagVertices,
+      edges: defaultCyclicEdges
+    });
+
+    const cycleDetected = await dag.verifyAcyclicity(true, false);
+
+    expect(cycleDetected).to.deep.equal([5, 3]);
+
+    try {
+      await dag.topologicalSort(true, false);
+    } catch (e: unknown) {
+      expect(e instanceof DirectedAcyclicGraphError).to.be.true;
+    }
+  });
+
+  it('should be able to detect cycles, using native code in the main thread', async () => {
+    const dag = new DirectedAcyclicGraph<number>({
+      vertices: defaultDagVertices,
+      edges: defaultCyclicEdges
+    });
+
+    const cycleDetected = await dag.verifyAcyclicity(false, false);
+
+    expect(cycleDetected).to.deep.equal([5, 3]);
 
     try {
       await dag.topologicalSort(false, false);

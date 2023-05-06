@@ -2,8 +2,8 @@ import { WasmModuleFunctionName } from '../enums';
 
 export type WasmModule = {
   [WasmModuleFunctionName.topologicalSort](edges: number[][]): number[];
-  [WasmModuleFunctionName.verifyAcyclic](
+  [WasmModuleFunctionName.verifyAcyclicity](
     outEdges: number[][],
     inEdges: number[][]
-  ): number;
+  ): number[];
 };

@@ -1,4 +1,15 @@
-export { DirectedAcyclicGraph } from './directed-acyclic-graph';
-export { DirectedAcyclicGraphError } from '../classes/directed-acyclic-graph-error';
-export { IEdge, IDirectedAcyclicGraph } from '../interfaces';
-export { DirectedAcyclicGraphErrorCode } from '../enums';
+import { DirectedAcyclicGraph } from './directed-acyclic-graph';
+import { DirectedAcyclicGraphError } from '../classes';
+import {
+  IDirectedAcyclicGraph,
+  IDirectedAcyclicGraphParameters
+} from '../interfaces';
+import { DirectedAcyclicGraphErrorCode } from '../enums';
+
+export {
+  DirectedAcyclicGraph,
+  DirectedAcyclicGraphError,
+  IDirectedAcyclicGraph,
+  IDirectedAcyclicGraphParameters,
+  DirectedAcyclicGraphErrorCode
+};

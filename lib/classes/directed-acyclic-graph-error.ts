@@ -1,10 +1,10 @@
 import { DirectedAcyclicGraphErrorCode } from '../enums';
 
 export class DirectedAcyclicGraphError extends Error {
-  readonly #directedCyclicGraphErrorCode: DirectedAcyclicGraphErrorCode;
+  private readonly _directedCyclicGraphErrorCode: DirectedAcyclicGraphErrorCode;
 
   public get directedCyclicGraphErrorCode() {
-    return this.#directedCyclicGraphErrorCode;
+    return this._directedCyclicGraphErrorCode;
   }
 
   public constructor(
@@ -13,6 +13,6 @@ export class DirectedAcyclicGraphError extends Error {
   ) {
     super(message);
 
-    this.#directedCyclicGraphErrorCode = directedCyclicGraphErrorCode;
+    this._directedCyclicGraphErrorCode = directedCyclicGraphErrorCode;
   }
 }

@@ -1,2 +1,3 @@
 export * from './wasm';
-export * from './function';
+export * from './functional';
+export * from './numerical';

@@ -1,4 +1,4 @@
-import { WebWorkerArguments } from 'lib/types';
+import { WebWorkerArguments } from '../types';
 import { WasmModuleFunctionName } from '../enums';
 import { IWebWorkerFunctionDefinition } from './web-worker-function-definition';
 
