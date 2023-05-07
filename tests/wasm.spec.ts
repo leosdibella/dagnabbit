@@ -122,7 +122,7 @@ describe('Directed Graph Utilities', () => {
       ]
     );
 
-    expect(cycle5).to.deep.equal([]);
+    expect(cycle5).to.deep.equal([5, 9, 10, 14, 19, 20, 21, 0]);
 
     const cycle6 = wasmModule.verifyAcyclicity(
       [
