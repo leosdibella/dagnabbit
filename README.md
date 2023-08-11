@@ -85,15 +85,20 @@ interface IDirectedAcyclicGraph<T> {
 Performance Testing
 ---
 
-To run performance tests use,
+To run performance tests there are a couple of options,
 
-```bash
-npm run start
-```
+Locally,
 
-This will initialize a web server that runs on `http:localhost:3000` which can be used to execute performance tests on the front end.
+1. `npm install`
+2. `npm run start:app && npm run start:api`
 
-Performance metrcis will show execution time comparsions of topologically sorting with,
+Docker Compose,
+
+1. `docker compose`
+
+Either option will initialize a web server that serves the front end on `http:localhost:3000` and a backend server which runs on `http:localhost:3001` which can be used to execute performance tests on the front end as well as the backend to compare Node v. Browser performance.
+
+Performance metrics will show execution time comparsions of vertifying acylicity and topologically sorting with a metric for each of the 4 following scenarios, in both the browser and in Node for a total of 8 datapoints.
 
 1. Native JS code running in the main thread
 2. WASM code running in the main thread
@@ -104,19 +109,23 @@ Test runs can be configured as follows,
 
 1. Single runs with a fixed (or random number) of vertices specified that generates a random DAG.
 2. Multiple runs with a fixed (or random number) of test cases, each generating a random DAG.
+3. An explicity specified DAG entered via user input (or file upload).
 
 Development
 ---
 
 1. `lib/assmebly` contains the AssemblyScript code that can be compiled into WASM.
-    - Run `npm run as:build:release` to build the release version of the code to the `as-build` directory
-    - Run `npm run as:build:debug` to build the debug version of the code to the `as-build` directory
-    - Run `npm run as:build` to build the both versions of the code to the `as-build` directory
-2. Run `npm run post-as-build` to transform the exported WASM / JS code into a usable module that can be packaged into the library code.
-        - This step takes the WASM code and encodes it into a base64 string, injects that string into the export module code so that it can be instantiated without making an additonal network request or requiring any library consumer to need to deal with any implementation details.
-3. Run `npm run test`, to execute the unit tests against the node version of the library.
+    - Run `npm run build:as` to build the release version of the code to the `as-build` directory
+    - Note this includes a post build step, which is executed by node via `post-as-build.mjs`. The WASM code is encoded it into a base64 string, then injected as a string string into the associated JS interfacing code that AssemblyScript creates for instantiating the WASM module. This allows the entirety of the build output to be packaged along with the rest of the library and circumvents the need for any library consumers to make additional network requests or worry about any implementation details around how the WASM code is initialized.
+2. Run `npm run test`, to execute the unit tests against the node version of the library.
     - Unit tests for the WASM code in isolation.
     - Unit tests for the DAG wrapper that the library consumer interfaces with.
-4. Run `npm run lint` to run the eslint configuration against the relevant `.ts` files.
-5. Run `npm run prettier:check` to check if all relevant files meet the requirements for prettier.
-6. Run 
+    - Note that running `npm run test` also executes the `build:as` step.
+3. Run `npm run lint` to run the eslint configuration against the relevant `.ts` files.
+4. Run `npm run prettier:check` to check if all relevant files meet the requirements for prettier.
+
+Building and Publishing
+---
+
+1. To build the library run `npm run build:lib`, all relevant code will be placed into `/dist`.
+2. Publish via npm.

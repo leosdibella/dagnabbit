@@ -1,15 +1,13 @@
 import { DirectedAcyclicGraph } from './directed-acyclic-graph';
-import { DirectedAcyclicGraphError } from '../classes';
+import { DirectedAcyclicGraphError } from 'lib/classes';
 import {
-  IDirectedAcyclicGraph,
-  IDirectedAcyclicGraphParameters
-} from '../interfaces';
-import { DirectedAcyclicGraphErrorCode } from '../enums';
+  DirectedAcyclicGraphParameters,
+  DirectedAcyclicGraphErrorType
+} from 'lib/types';
 
 export {
   DirectedAcyclicGraph,
   DirectedAcyclicGraphError,
-  IDirectedAcyclicGraph,
-  IDirectedAcyclicGraphParameters,
-  DirectedAcyclicGraphErrorCode
+  DirectedAcyclicGraphErrorType,
+  DirectedAcyclicGraphParameters
 };

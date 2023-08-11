@@ -1,14 +1,15 @@
+import { IDirectedAcyclicGraph } from 'lib/interfaces';
+import { DirectedAcyclicGraphBase } from 'lib/classes';
+import { instantiateWasmModule } from 'lib/utilities';
 import {
-  IWebWorkerParameters,
-  IDirectedAcyclicGraph,
-  IWebWorkerMessage,
-  IDirectedAcyclicGraphParameters
-} from '../interfaces';
-import { DirectedAcyclicGraphBase } from '../classes';
+  WebWorkerFunctionName,
+  WebWorkerResponse,
+  WebWorkerType,
+  WebWorkerParameters,
+  DirectedAcyclicGraphParameters,
+  WebWorkerMessage
+} from 'lib/types';
 import { Worker, WorkerOptions, MessagePort } from 'worker_threads';
-import { instantiateWasmModule } from '../utilities';
-import { WebWorkerResponse } from '../types';
-import { WasmModuleFunctionName, WebWorkerType } from '../enums';
 
 export class DirectedAcyclicGraph<T = unknown>
   extends DirectedAcyclicGraphBase<T>
@@ -26,11 +27,11 @@ export class DirectedAcyclicGraph<T = unknown>
     eval: true
   };
 
-  private static _nativeWebWorker<U extends WasmModuleFunctionName>() {
+  private static _nativeWebWorker<U extends WebWorkerFunctionName>() {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const parentPort = require('worker_threads').parentPort as MessagePort;
 
-    parentPort.on('message', (message: IWebWorkerMessage<U>) => {
+    parentPort.on('message', (message: WebWorkerMessage<U>) => {
       // eslint-disable-next-line no-new-func
       const nativeFunction = new Function(
         ...message.webWorkerFunctionDefinition.argumentNames,
@@ -43,11 +44,11 @@ export class DirectedAcyclicGraph<T = unknown>
     });
   }
 
-  private static _wasmWebWorker<U extends WasmModuleFunctionName>() {
+  private static _wasmWebWorker<U extends WebWorkerFunctionName>() {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const parentPort = require('worker_threads').parentPort as MessagePort;
 
-    parentPort.on('message', (message: IWebWorkerMessage<U>) => {
+    parentPort.on('message', (message: WebWorkerMessage<U>) => {
       // eslint-disable-next-line @typescript-eslint/require-await
       const AsyncFunction = (async (_: unknown) => _).constructor;
 
@@ -68,17 +69,14 @@ export class DirectedAcyclicGraph<T = unknown>
     });
   }
 
-  private static async _createWebWorker<U extends WasmModuleFunctionName>(
-    parameters: IWebWorkerParameters<U>
+  private static async _createWebWorker<U extends WebWorkerFunctionName>(
+    parameters: WebWorkerParameters<U>
   ): Promise<WebWorkerResponse<U>> {
     const workerFunction = parameters.useWasm
       ? DirectedAcyclicGraph._wasmWebWorker
       : DirectedAcyclicGraph._nativeWebWorker;
 
-    const webWorkerType = parameters.useWasm
-      ? WebWorkerType.wasm
-      : WebWorkerType.native;
-
+    const webWorkerType: WebWorkerType = parameters.useWasm ? 'wasm' : 'native';
     const webWorkerCode = `(function ${workerFunction.toString().trim()})()`;
 
     const webWorker = new Worker(
@@ -96,7 +94,7 @@ export class DirectedAcyclicGraph<T = unknown>
       });
     });
 
-    const webWorkerMessage: IWebWorkerMessage<U> = {
+    const webWorkerMessage: WebWorkerMessage<U> = {
       webWorkerArguments: parameters.webWorkerArguments,
       webWorkerFunctionDefinition:
         this._webWorkerFunctionDefinitions[parameters.wasmModuleFunctionName][
@@ -115,7 +113,7 @@ export class DirectedAcyclicGraph<T = unknown>
   }
 
   public clone(
-    parameters?: Omit<IDirectedAcyclicGraphParameters<T>, 'vertices' | 'edges'>
+    parameters?: Omit<DirectedAcyclicGraphParameters<T>, 'vertices' | 'edges'>
   ) {
     return new DirectedAcyclicGraph({
       ...(parameters ?? {

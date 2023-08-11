@@ -1,9 +1,7 @@
-import { WasmModuleFunctionName } from '../enums';
+import { AcyclicVerifier } from './acyclic-verifier';
+import { TopologicalSorter } from './topological-sorter';
 
 export type WasmModule = {
-  [WasmModuleFunctionName.topologicalSort](edges: number[][]): number[];
-  [WasmModuleFunctionName.verifyAcyclicity](
-    outEdges: number[][],
-    inEdges: number[][]
-  ): number[];
+  topologicalSort: TopologicalSorter;
+  verifyAcyclicity: AcyclicVerifier;
 };

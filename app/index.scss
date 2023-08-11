@@ -1,0 +1,33 @@
+input.tab-input {
+  display: none;
+}
+
+input.tab-input {
+  &+ label {
+    display: inline-block;
+    border: 1px solid #999999;
+    background: #eeeeee;
+    padding: 0.25rem 0.75rem;
+    border-radius: 4px 4px 0 0;
+    position: relative;
+    top: 1px;
+  }
+
+  &:checked {
+    &+ label {
+      background: #ffffff;
+      border-bottom: 1px solid transparent;
+    }
+  }
+}
+
+input.tab-input ~ .tab {
+  display: none;
+  border-top: 1px solid #999999;
+  padding: 0.75rem;
+}
+
+#randomized:checked ~ .tab.specified,
+#specified:checked ~ .tab.specified {
+  display: block;
+}

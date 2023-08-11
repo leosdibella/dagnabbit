@@ -1,18 +1,14 @@
-import { DirectedAcyclicGraphErrorCode } from '../enums';
+import { DirectedAcyclicGraphErrorType } from 'lib/types';
 
 export class DirectedAcyclicGraphError extends Error {
-  private readonly _directedCyclicGraphErrorCode: DirectedAcyclicGraphErrorCode;
-
-  public get directedCyclicGraphErrorCode() {
-    return this._directedCyclicGraphErrorCode;
+  public get directedCyclicGraphErrorType() {
+    return this._directedCyclicGraphErrorType;
   }
 
   public constructor(
-    directedCyclicGraphErrorCode: DirectedAcyclicGraphErrorCode,
+    private readonly _directedCyclicGraphErrorType: DirectedAcyclicGraphErrorType,
     message: string
   ) {
     super(message);
-
-    this._directedCyclicGraphErrorCode = directedCyclicGraphErrorCode;
   }
 }

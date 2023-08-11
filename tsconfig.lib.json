@@ -10,10 +10,13 @@
     "downlevelIteration": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
-    "module": "ESNext",
+    "module": "commonjs",
     "moduleResolution": "node",
     "importHelpers": true,
-    "paths": {},
+    "paths": {
+      "@shared/*": ["../shared/*"],
+      "@lib/*": ["../lib/*"]
+    },
     "target": "ES2019",
     "typeRoots": ["node_modules/@types"],
     "types": ["assemblyscript/std/types/portable", "node"],
@@ -24,6 +27,7 @@
     "allowJs": true
   },
   "include": [
+    "./shared/**/*.ts",
     "./lib/**/*.ts",
     "./lib/utilities/wasm.js"
   ],

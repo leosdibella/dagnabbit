@@ -1,8 +1,8 @@
-import { WasmModuleFunctionName } from '../enums';
+import { WebWorkerFunctionName } from './web-worker-function-name';
 
-export type WebWorkerResponse<T extends WasmModuleFunctionName> =
-  T extends WasmModuleFunctionName.topologicalSort
+export type WebWorkerResponse<T extends WebWorkerFunctionName> =
+  T extends 'topologicalSort'
     ? number[]
-    : T extends WasmModuleFunctionName.verifyAcyclicity
+    : T extends 'verifyAcyclicity'
     ? number[]
     : never;

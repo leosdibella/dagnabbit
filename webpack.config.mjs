@@ -2,13 +2,14 @@ import * as path from 'path';
 import { fileURLToPath } from 'url';
 import HtmlWebpackPlugin from 'html-webpack-plugin';
 import TsconfigPathsPluginPkg from 'tsconfig-paths-webpack-plugin';
-import * as ForkTsCheckerWebpackPlugin from 'fork-ts-checker-webpack-plugin';
-import webpack from 'webpack';
+import ForkTsCheckerWebpackPlugin from 'fork-ts-checker-webpack-plugin';
+import nodeExternals from 'webpack-node-externals';
 
 const { TsconfigPathsPlugin } = TsconfigPathsPluginPkg;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const nodeConfig = {
+const nodeConfig = (env) => ({
+  mode: env.isProduction ? 'production' : 'development',
   watchOptions: {
     ignored: /node_modules/
   },
@@ -19,7 +20,8 @@ const nodeConfig = {
     path: path.resolve(__dirname, './dist'),
     filename: 'node.js',
     libraryTarget: 'umd',
-    libraryExport: 'default'
+    libraryExport: 'default',
+    clean: true
   },
   resolve: {
     extensions: ['.ts', '.js'],
@@ -28,23 +30,21 @@ const nodeConfig = {
       new TsconfigPathsPlugin()
     ]
   },
-  plugins: [
-    new ForkTsCheckerWebpackPlugin({
-      configFile: 'tsconfig.lib.json'
-    })
-  ],
   module: {
     rules: [
       {
         test: /\.ts$/,
         loader: 'ts-loader',
-        options: {}
+        options: {
+          configFile: path.resolve(__dirname, './tsconfig.lib.json')
+        }
       }
     ]
   }
-};
+});
    
-const browserConfig = {
+const browserConfig = (env) => ({
+  mode: env.isProduction ? 'production' : 'development',
   watchOptions: {
     ignored: /node_modules/
   },
@@ -54,7 +54,43 @@ const browserConfig = {
     path: path.resolve(__dirname, './dist'),
     filename: 'browser.js',
     libraryTarget: 'umd',
-    globalObject: 'this'
+    globalObject: 'this',
+    libraryExport: 'default',
+    umdNamedDefine: true,
+    library: 'dagnabbit'
+  },
+  resolve: {
+    extensions: ['.ts', '.js'],
+    alias: {},
+    plugins: [
+      new TsconfigPathsPlugin()
+    ]
+  },
+  module: {
+    rules: [
+      {
+        test: /\.ts$/,
+        loader: 'ts-loader',
+        options: {
+          configFile: path.resolve(__dirname, './tsconfig.lib.json')
+        }
+      }
+    ]
+  }
+});
+
+const appConfig = (env) => ({
+  mode: env.isProduction ? 'production' : 'development',
+  watchOptions: {
+    ignored: /node_modules/
+  },
+  entry: './app/index.ts',
+  target: 'web',
+  devtool: 'source-map',
+  output: {
+    path: path.resolve(__dirname, './app-dist'),
+    filename:'[name].[contenthash].js',
+    clean: true
   },
   resolve: {
     extensions: ['.ts', '.js'],
@@ -65,7 +101,12 @@ const browserConfig = {
   },
   plugins: [
     new ForkTsCheckerWebpackPlugin({
-      configFile: 'tsconfig.lib.json'
+      typescript: {
+        configFile: path.resolve(__dirname, './tsconfig.app.json')
+      }
+    }),
+    new HtmlWebpackPlugin({
+      template: './app/index.html'
     })
   ],
   module: {
@@ -73,45 +114,20 @@ const browserConfig = {
       {
         test: /\.ts$/,
         loader: 'ts-loader',
-        options: {}
+        options: {
+          configFile: path.resolve(__dirname, './tsconfig.app.json')
+        }
       }
     ]
-  }
-};
-
-const appConfig = {
-  watchOptions: {
-    ignored: /node_modules/
   },
-  entry: './app/index.ts',
-  target: 'web',
-  output: {
-    path: path.resolve(__dirname, './app-dist'),
-    filename: 'browser.js',
-    libraryTarget: 'umd',
-    globalObject: 'this'
-  },
-  resolve: {
-    extensions: ['.ts', '.js'],
-    alias: {},
-    plugins: [
-      new TsconfigPathsPlugin()
-    ]
-  },
-  plugins: [
-    new ForkTsCheckerWebpackPlugin(),
-    new HtmlWebpackPlugin({
-      template: './app/index.html'
-    })
-  ],
   devServer: {
     hot: true,
-    port: appPort,
+    port: 3000,
     server:  {
       type: 'http'
     },
     static: {
-      directory: path.resolve(__dirname, './app-dist')
+      directory: path.resolve(__dirname, './app-dist'),
     },
     devMiddleware: {
       index: true,
@@ -122,112 +138,12 @@ const appConfig = {
       writeToDisk: true
     }
   }
-};
-
-const generalConfig = {
-  watchOptions: {
-    ignored: /node_modules/
-  },
-  experiments: {
-    asyncWebAssembly: true
-  },
-  module: {
-    rules: [
-      {
-        test: /\.ts$/,
-        loader: 'ts-loader',
-        options: {
-          transpileOnly: !!env.noTypeCheck,
-          onlyCompileBundledFiles: true
-        }
-      }
-    ]
-  },
-  resolve: {
-    extensions: ['.ts', '.js'],
-    alias: {},
-    plugins: [
-      new ForkTsCheckerWebpackPlugin(),
-      new TsconfigPathsPlugin()
-    ]
-  }
-}
-
-
+});
 
 export default (env = {}) => {
   return [
-    nodeConfig,
-    browserConfig,
-    appConfig
+    nodeConfig(env),
+    browserConfig(env),
+    appConfig(env)
   ];
-
-  const server = {
-    type: 'http'
-  }
-
-  return {
-    node: {
-      __dirname: true
-    },
-    watch: env.isProduction ? false : !!env.shouldWatch,
-    watchOptions: {
-      ignored: /node_modules/
-    },
-    mode: env.isProduction ? 'production' : 'development',
-    devtool: 'source-map',
-    entry: path.resolve(__dirname, './src/index.ts'),
-    output: {
-      filename: env.isProduction ? '[name].[contenthash].js' : '[hash].js',
-      path: path.resolve(__dirname, 'dist'),
-      publicPath: '/',
-      clean: true
-    },
-    experiments: {
-      asyncWebAssembly: true
-    },
-    module: {
-      rules: [
-        {
-          test: /\.ts$/,
-          loader: 'ts-loader',
-          options: {
-            transpileOnly: !!env.noTypeCheck,
-            onlyCompileBundledFiles: true
-          }
-        }
-      ]
-    },
-    resolve: {
-      extensions: ['.ts', '.js', '.json'],
-      alias: {},
-      plugins: [
-        new TsconfigPathsPlugin()
-      ]
-    },
-    plugins: [
-      new HtmlWebpackPlugin({
-        template: './src/index.html'
-      }),
-      new webpack.DefinePlugin({
-        ACICULATE_API_ORIGIN: JSON.stringify(apiOrigin)
-      })
-    ],
-    devServer: {
-      hot: true,
-      port: appPort,
-      server,
-      static: {
-        directory: path.resolve(__dirname, './dist')
-      },
-      devMiddleware: {
-        index: true,
-        mimeTypes: {
-          phtml: 'text/html'
-        },
-        publicPath: './dist',
-        writeToDisk: true
-      }
-    }
-  }
 };

@@ -1,13 +1,14 @@
+import { IDirectedAcyclicGraph } from 'lib/interfaces';
+import { DirectedAcyclicGraphBase } from 'lib/classes';
+import { instantiateWasmModule } from 'lib/utilities';
 import {
-  IDirectedAcyclicGraph,
-  IDirectedAcyclicGraphParameters,
-  IWebWorkerMessage,
-  IWebWorkerParameters
-} from '../interfaces';
-import { DirectedAcyclicGraphBase } from '../classes';
-import { instantiateWasmModule } from '../utilities';
-import { WasmModuleFunctionName, WebWorkerType } from '../enums';
-import { WebWorkerResponse } from '../types';
+  WebWorkerFunctionName,
+  WebWorkerResponse,
+  WebWorkerType,
+  WebWorkerParameters,
+  WebWorkerMessage,
+  DirectedAcyclicGraphParameters
+} from 'lib/types';
 
 export class DirectedAcyclicGraph<T = unknown>
   extends DirectedAcyclicGraphBase<T>
@@ -30,8 +31,8 @@ export class DirectedAcyclicGraph<T = unknown>
 
   private static _webWorkerId = BigInt(0);
 
-  private static _nativeWebWorker<U extends WasmModuleFunctionName>() {
-    self.onmessage = (messageEvent: MessageEvent<IWebWorkerMessage<U>>) => {
+  private static _nativeWebWorker<U extends WebWorkerFunctionName>() {
+    self.onmessage = (messageEvent: MessageEvent<WebWorkerMessage<U>>) => {
       // eslint-disable-next-line no-new-func
       const nativeFunction = new Function(
         ...messageEvent.data.webWorkerFunctionDefinition.argumentNames,
@@ -44,8 +45,8 @@ export class DirectedAcyclicGraph<T = unknown>
     };
   }
 
-  private static _wasmWebWorker<U extends WasmModuleFunctionName>() {
-    self.onmessage = (messageEvent: MessageEvent<IWebWorkerMessage<U>>) => {
+  private static _wasmWebWorker<U extends WebWorkerFunctionName>() {
+    self.onmessage = (messageEvent: MessageEvent<WebWorkerMessage<U>>) => {
       // eslint-disable-next-line @typescript-eslint/require-await
       const AsyncFunction = (async (_: unknown) => _).constructor;
 
@@ -66,19 +67,15 @@ export class DirectedAcyclicGraph<T = unknown>
     };
   }
 
-  private static async _createWebWorker<U extends WasmModuleFunctionName>(
-    parameters: IWebWorkerParameters<U>
+  private static async _createWebWorker<U extends WebWorkerFunctionName>(
+    parameters: WebWorkerParameters<U>
   ): Promise<WebWorkerResponse<U>> {
     const workerFunction = parameters.useWasm
       ? DirectedAcyclicGraph._wasmWebWorker
       : DirectedAcyclicGraph._nativeWebWorker;
 
     const webWorkerCode = `(${workerFunction.toString().trim()})()`;
-
-    const webWorkerType = parameters.useWasm
-      ? WebWorkerType.wasm
-      : WebWorkerType.native;
-
+    const webWorkerType: WebWorkerType = parameters.useWasm ? 'wasm' : 'native';
     const webWorkerUrlName = `${parameters.wasmModuleFunctionName}-${webWorkerType}`;
 
     let webWorkerUrl =
@@ -113,7 +110,7 @@ export class DirectedAcyclicGraph<T = unknown>
       };
     });
 
-    const webWorkerMessage: IWebWorkerMessage<U> = {
+    const webWorkerMessage: WebWorkerMessage<U> = {
       webWorkerArguments: parameters.webWorkerArguments,
       webWorkerFunctionDefinition:
         this._webWorkerFunctionDefinitions[parameters.wasmModuleFunctionName][
@@ -132,7 +129,7 @@ export class DirectedAcyclicGraph<T = unknown>
   }
 
   public clone(
-    parameters?: Omit<IDirectedAcyclicGraphParameters<T>, 'vertices' | 'edges'>
+    parameters?: Omit<DirectedAcyclicGraphParameters<T>, 'vertices' | 'edges'>
   ) {
     return new DirectedAcyclicGraph({
       ...(parameters ?? {

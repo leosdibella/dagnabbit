@@ -4,25 +4,39 @@
     <h1>
       Directed Acyclic Graph - Topological Sort Performance Comparison
     </h1>
-    <form>
-      <div id="primary-group">
-        <label for="multiple">
-          Multiple
-        </label>
-        <input
-          id="multiple"
-          name="number-of-trials"
-          type="radio"
-        />
-        <label for="single">
-          Single
-        </label>
-        <input
-          id="single"
-          name="number-of-trials"
-          type="radio"
-        />
+    <dagnabbit-tabs>
+      <dagnabbit-tab selected>
+        <span slot="label">
+          Randomized
+        </span>
+      </dagnabbit-tab>
+      <dagnabbit-tab>
+        <span slot="label">
+          Specified
+        </span>
+      </dagnabbit-tab>
+      <div is="dagnabbit-tab-panel">
+        <dagnabbit-randomized>
+        </dagnabbit-randomized>
       </div>
+      <div is="dagnabbit-tab-panel">
+        Specific stuff goes here
+      </div>
+    </dagnabbit-tabs>
+    <form>
+      <div class="tab specified">
+        <input
+          type="file"
+          accept=".json, application/json"
+          id="graph-file-upload"
+        />
+        <label
+          for="graph-file-upload"
+        >
+          Upload Graphs
+        </label>
+      </div>
+
       <div id="multiple-group">
         <div>
           <label for="number-of-trials">
@@ -76,6 +90,10 @@
         Run
       </button>
     </form>
+    <table id="results">
+
+    </table>
+
     <div id="results">
       <div id="results-header">
         <div>
@@ -101,6 +119,4 @@
       </div>
     </div>
   </body>
-  <script src="">
-  </script>
 </html>

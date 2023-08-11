@@ -1,4 +1,4 @@
-import { IDirectedAcyclicGraphParameters } from './directed-acyclic-graph-parameters';
+import { DirectedAcyclicGraphParameters } from 'lib/types';
 
 export interface IDirectedAcyclicGraph<T> {
   readonly vertices: T[];
@@ -16,7 +16,7 @@ export interface IDirectedAcyclicGraph<T> {
   removeVertex(vertexIndex: number): void;
   removeVertices(vertexIndices: number[]): void;
   clone(
-    parameters: Omit<IDirectedAcyclicGraphParameters<T>, 'vertices' | 'edges'>
+    parameters: Omit<DirectedAcyclicGraphParameters<T>, 'vertices' | 'edges'>
   ): IDirectedAcyclicGraph<T>;
   clear(): void;
   /** Sort the DAG topologically,

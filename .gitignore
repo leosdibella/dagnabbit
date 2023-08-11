@@ -1,4 +1,5 @@
 /node_modules
 /as-build
 /dist
+/app-dist
 /lib/utilities/wasm.js

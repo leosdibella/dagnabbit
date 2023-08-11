@@ -1,32 +1,25 @@
-import {
-  IDirectedAcyclicGraphParameters,
-  IWebWorkerFunctionDefinition
-} from '../interfaces';
 import { DirectedAcyclicGraphError } from './directed-acyclic-graph-error';
-import {
-  DirectedAcyclicGraphErrorCode,
-  EdgeOperation,
-  WasmModuleFunctionName,
-  WebWorkerType
-} from '../enums';
-import { topologicalSort, verifyAcyclicity } from '../assembly';
-import {
-  instantiateWasmModule,
-  isNonNegativeInteger,
-  parseFunctionDefinition
-} from '../utilities';
+import { topologicalSort, verifyAcyclicity } from 'lib/assembly';
+import { instantiateWasmModule, parseFunctionDefinition } from 'lib/utilities';
 import {
   AcyclicVerifier,
+  DirectedAcyclicGraphErrorType,
+  EdgeOperation,
   TopologicalSorter,
   WasmModule,
-  WebWorkerFactory
-} from '../types';
+  WebWorkerFactory,
+  WebWorkerFunctionName,
+  WebWorkerType,
+  WebWorkerFunctionDefinition,
+  DirectedAcyclicGraphParameters
+} from 'lib/types';
+import { isNonNegativeInteger } from 'shared/utilities';
 
 export abstract class DirectedAcyclicGraphBase<T = unknown> {
   private static readonly _defaultVertexCardinalityWasmThreshold = 20;
   private static readonly _defaultVertexCardinalityWebWorkerThreshold = 25;
 
-  private static readonly _wasmModuleInstantiationFunctionDefinition: Readonly<IWebWorkerFunctionDefinition> =
+  private static readonly _wasmModuleInstantiationFunctionDefinition: Readonly<WebWorkerFunctionDefinition> =
     parseFunctionDefinition(instantiateWasmModule);
 
   private static _wasmModule: Readonly<WasmModule>;
@@ -36,19 +29,17 @@ export abstract class DirectedAcyclicGraphBase<T = unknown> {
 
   protected static readonly _webWorkerFunctionDefinitions: Readonly<
     Record<
-      WasmModuleFunctionName,
-      Readonly<Record<WebWorkerType, Readonly<IWebWorkerFunctionDefinition>>>
+      WebWorkerFunctionName,
+      Readonly<Record<WebWorkerType, Readonly<WebWorkerFunctionDefinition>>>
     >
   > = {
-    [WasmModuleFunctionName.topologicalSort]: {
-      [WebWorkerType.native]: parseFunctionDefinition(topologicalSort),
-      [WebWorkerType.wasm]:
-        DirectedAcyclicGraphBase._wasmModuleInstantiationFunctionDefinition
+    topologicalSort: {
+      native: parseFunctionDefinition(topologicalSort),
+      wasm: DirectedAcyclicGraphBase._wasmModuleInstantiationFunctionDefinition
     },
-    [WasmModuleFunctionName.verifyAcyclicity]: {
-      [WebWorkerType.native]: parseFunctionDefinition(verifyAcyclicity),
-      [WebWorkerType.wasm]:
-        DirectedAcyclicGraphBase._wasmModuleInstantiationFunctionDefinition
+    verifyAcyclicity: {
+      native: parseFunctionDefinition(verifyAcyclicity),
+      wasm: DirectedAcyclicGraphBase._wasmModuleInstantiationFunctionDefinition
     }
   };
 
@@ -79,32 +70,32 @@ export abstract class DirectedAcyclicGraphBase<T = unknown> {
     fromVertexIndex: number,
     toVertexIndex: number,
     edgeOperation: EdgeOperation
-  ): [DirectedAcyclicGraphErrorCode, string] | undefined {
+  ): [DirectedAcyclicGraphErrorType, string] | undefined {
     if (!isNonNegativeInteger(fromVertexIndex)) {
       return [
-        DirectedAcyclicGraphErrorCode.invalidEdge,
+        'invalidEdge',
         `The edge defined by ${fromVertexIndex} to ${toVertexIndex} is invalid, ${fromVertexIndex} is not a valid index, must be a non-negative integer.`
       ];
     }
 
     if (!isNonNegativeInteger(toVertexIndex)) {
       return [
-        DirectedAcyclicGraphErrorCode.invalidEdge,
+        'invalidEdge',
         `The edge defined by ${fromVertexIndex} to ${toVertexIndex} is invalid, ${toVertexIndex} is not a valid index, must be a non-negative integer.`
       ];
     }
 
-    if (edgeOperation === EdgeOperation.add) {
+    if (edgeOperation === 'add') {
       if (fromVertexIndex < 0 || fromVertexIndex >= this._vertices.length) {
         return [
-          DirectedAcyclicGraphErrorCode.invalidEdge,
+          'invalidEdge',
           `The edge (${fromVertexIndex}) to (${toVertexIndex}) is invalid, ${fromVertexIndex} does not refer to a valid vertex`
         ];
       }
 
       if (toVertexIndex < 0 || toVertexIndex >= this._vertices.length) {
         return [
-          DirectedAcyclicGraphErrorCode.invalidEdge,
+          'invalidEdge',
           `The edge (${fromVertexIndex}) -> (${toVertexIndex}) is invalid, ${toVertexIndex} does not refer to a valid vertex`
         ];
       }
@@ -114,14 +105,14 @@ export abstract class DirectedAcyclicGraphBase<T = unknown> {
 
       if (hasExistingEdge) {
         return [
-          DirectedAcyclicGraphErrorCode.duplicateEdge,
+          'duplicateEdge',
           `The edge (${fromVertexIndex}) -> (${toVertexIndex}) already exists.`
         ];
       }
     }
   }
 
-  private _initialize(parameters?: IDirectedAcyclicGraphParameters<T>) {
+  private _initialize(parameters?: DirectedAcyclicGraphParameters<T>) {
     parameters?.vertices?.forEach((vertex) => this.addVertex(vertex));
 
     if (!parameters?.edges) {
@@ -160,7 +151,7 @@ export abstract class DirectedAcyclicGraphBase<T = unknown> {
   private async _verifyAcyclicityWebWorker(useWasm: boolean) {
     const cycleDetected = await DirectedAcyclicGraphBase._webWorkerFactory({
       webWorkerArguments: [this._outEdges, this._inEdges],
-      wasmModuleFunctionName: WasmModuleFunctionName.verifyAcyclicity,
+      wasmModuleFunctionName: 'verifyAcyclicity',
       useWasm: useWasm && DirectedAcyclicGraphBase._supportsWasm
     });
 
@@ -196,7 +187,7 @@ export abstract class DirectedAcyclicGraphBase<T = unknown> {
   private async _topologicalSortWebWorker(useWasm: boolean) {
     const topologicallySorted =
       await DirectedAcyclicGraphBase._webWorkerFactory({
-        wasmModuleFunctionName: WasmModuleFunctionName.topologicalSort,
+        wasmModuleFunctionName: 'topologicalSort',
         useWasm: useWasm && DirectedAcyclicGraphBase._supportsWasm,
         webWorkerArguments: [this._outEdges]
       });
@@ -215,7 +206,7 @@ export abstract class DirectedAcyclicGraphBase<T = unknown> {
     const errorParameters = this._validateEdge(
       fromVertexIndex,
       toVertexIndex,
-      EdgeOperation.add
+      'add'
     );
 
     if (!errorParameters) {
@@ -235,7 +226,7 @@ export abstract class DirectedAcyclicGraphBase<T = unknown> {
     const errorParameters = this._validateEdge(
       fromVertexIndex,
       toVertexIndex,
-      EdgeOperation.remove
+      'remove'
     );
 
     if (!errorParameters) {
@@ -395,7 +386,7 @@ export abstract class DirectedAcyclicGraphBase<T = unknown> {
 
       if (this._cycleDetected?.length) {
         throw new DirectedAcyclicGraphError(
-          DirectedAcyclicGraphErrorCode.cycleDetected,
+          'cycleDetected',
           `Cycle detected: ${this._cycleDetected.join(' -> ')}`
         );
       }
@@ -414,7 +405,7 @@ export abstract class DirectedAcyclicGraphBase<T = unknown> {
     this._cycleDetected = undefined;
   }
 
-  public constructor(parameters?: IDirectedAcyclicGraphParameters<T>) {
+  public constructor(parameters?: DirectedAcyclicGraphParameters<T>) {
     this._vertexCardinalityWasmThreshold =
       DirectedAcyclicGraphBase._defaultVertexCardinalityWasmThreshold;
 

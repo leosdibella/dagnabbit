@@ -1,0 +1,13 @@
+/dist/
+/as-build/
+/tests/
+/node_modules/
+/.husky/
+.eslintrc.json
+.gitignore
+.prettierrc
+api.Dockerfile
+app.Dockerfile
+docker-compose.yaml
+package-lock.json
+README.md

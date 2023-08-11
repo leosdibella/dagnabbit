@@ -4,7 +4,7 @@
     "noUnusedLocals": true,
     "noImplicitAny": true,
     "baseUrl": ".",
-    "outDir": "./ts-dist/",
+    "outDir": "./dist/",
     "sourceMap": true,
     "declaration": true,
     "downlevelIteration": true,
@@ -13,7 +13,12 @@
     "module": "ESNext",
     "moduleResolution": "node",
     "importHelpers": true,
-    "paths": {},
+    "paths": {
+      "@shared/*": ["../shared/*"],
+      "@lib/*": ["../lib/*"],
+      "@api/*": ["../api/*"],
+      "@app/*": ["../app/*"]
+    },
     "target": "ES2019",
     "typeRoots": ["node_modules/@types"],
     "lib": ["dom", "ES2020", "ES2021", "ES2022", "WebWorker"],
@@ -23,7 +28,10 @@
     "allowJs": true
   },
   "include": [
-    "lib/**/*.ts",
+    "./api/**/*.ts",
+    "./app/**/*.ts",
+    "./lib/**/*.ts",
+    "./shared/**/*.ts",
     "./lib/utilities/wasm.js" 
   ],
   "exclude": [

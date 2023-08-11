@@ -1,9 +1,9 @@
-import { IWebWorkerFunctionDefinition } from '../interfaces';
+import { WebWorkerFunctionDefinition } from 'lib/types';
 
 export function parseFunctionDefinition(
   // eslint-disable-next-line @typescript-eslint/ban-types
   functionReference: Function
-): IWebWorkerFunctionDefinition {
+): WebWorkerFunctionDefinition {
   const functionText = functionReference.toString().trim();
   const firstBraceIndex = functionText.indexOf('{');
   const isPlainFunction = functionText.startsWith('function ');
