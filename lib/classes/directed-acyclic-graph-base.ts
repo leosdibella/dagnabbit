@@ -1,47 +1,94 @@
 import { DirectedAcyclicGraphError } from './directed-acyclic-graph-error';
 import { topologicalSort, verifyAcyclicity } from 'lib/assembly';
-import { instantiateWasmModule, parseFunctionDefinition } from 'lib/utilities';
+import { parseFunctionDefinition } from 'lib/utilities';
 import {
-  AcyclicVerifier,
   DirectedAcyclicGraphErrorType,
   EdgeOperation,
-  TopologicalSorter,
   WasmModule,
   WebWorkerFactory,
   WebWorkerFunctionName,
-  WebWorkerType,
   WebWorkerFunctionDefinition,
-  DirectedAcyclicGraphParameters
+  DirectedAcyclicGraphParameters,
+  WebWorkerFunction,
+  Constructor,
+  WebWorkerType
 } from 'lib/types';
 import { isNonNegativeInteger } from 'shared/utilities';
+import { IDirectedAcyclicGraph } from 'lib/interfaces';
+import 'assemblyscript/std/portable/index.js';
 
 export abstract class DirectedAcyclicGraphBase<T = unknown> {
   private static readonly _defaultVertexCardinalityWasmThreshold = 20;
   private static readonly _defaultVertexCardinalityWebWorkerThreshold = 25;
 
-  private static readonly _wasmModuleInstantiationFunctionDefinition: Readonly<WebWorkerFunctionDefinition> =
-    parseFunctionDefinition(instantiateWasmModule);
+  private static _wasmModule: Readonly<WasmModule> | undefined;
 
-  private static _wasmModule: Readonly<WasmModule>;
+  private static readonly _webWorkerFunctions: {
+    [k in WebWorkerFunctionName]: WebWorkerFunction<k>;
+  } = {
+    topologicalSort,
+    verifyAcyclicity
+  };
+
+  private static async _getLocalFunction<T extends WebWorkerFunctionName>(
+    useWasm: boolean,
+    webWorkerfunctionName: T
+  ) {
+    if (
+      useWasm &&
+      DirectedAcyclicGraphBase._supportsWasm &&
+      DirectedAcyclicGraphBase._instantiateWasmModule
+    ) {
+      if (!DirectedAcyclicGraphBase._wasmModule) {
+        DirectedAcyclicGraphBase._wasmModule =
+          await DirectedAcyclicGraphBase._instantiateWasmModule();
+      }
+
+      return DirectedAcyclicGraphBase._wasmModule[
+        webWorkerfunctionName
+      ] as WebWorkerFunction<T>;
+    } else {
+      return DirectedAcyclicGraphBase._webWorkerFunctions[
+        webWorkerfunctionName
+      ];
+    }
+  }
+
+  protected static _instantiateWasmModule:
+    | (() => Promise<Readonly<WasmModule>>)
+    | undefined;
+
   protected static _webWorkerFactory: WebWorkerFactory;
   protected static _supportsWasm: boolean;
   protected static _supportsWebWorkers: boolean;
 
-  protected static readonly _webWorkerFunctionDefinitions: Readonly<
-    Record<
-      WebWorkerFunctionName,
-      Readonly<Record<WebWorkerType, Readonly<WebWorkerFunctionDefinition>>>
-    >
-  > = {
-    topologicalSort: {
-      native: parseFunctionDefinition(topologicalSort),
-      wasm: DirectedAcyclicGraphBase._wasmModuleInstantiationFunctionDefinition
-    },
-    verifyAcyclicity: {
-      native: parseFunctionDefinition(verifyAcyclicity),
-      wasm: DirectedAcyclicGraphBase._wasmModuleInstantiationFunctionDefinition
+  private static __webWorkerFunctionDefinitions:
+    | Record<
+        WebWorkerFunctionName,
+        Readonly<Record<WebWorkerType, Readonly<WebWorkerFunctionDefinition>>>
+      >
+    | undefined;
+
+  public static get _webWorkerFunctionDefinitions() {
+    if (!DirectedAcyclicGraphBase.__webWorkerFunctionDefinitions) {
+      const wasmModuleInstantiationFunctionDefinition = parseFunctionDefinition(
+        DirectedAcyclicGraphBase._instantiateWasmModule!
+      );
+
+      DirectedAcyclicGraphBase.__webWorkerFunctionDefinitions = {
+        topologicalSort: {
+          native: parseFunctionDefinition(topologicalSort),
+          wasm: wasmModuleInstantiationFunctionDefinition
+        },
+        verifyAcyclicity: {
+          native: parseFunctionDefinition(verifyAcyclicity),
+          wasm: wasmModuleInstantiationFunctionDefinition
+        }
+      };
     }
-  };
+
+    return DirectedAcyclicGraphBase.__webWorkerFunctionDefinitions;
+  }
 
   private readonly _inEdges: number[][] = [];
   private readonly _outEdges: number[][] = [];
@@ -110,6 +157,8 @@ export abstract class DirectedAcyclicGraphBase<T = unknown> {
         ];
       }
     }
+
+    return;
   }
 
   private _initialize(parameters?: DirectedAcyclicGraphParameters<T>) {
@@ -127,17 +176,10 @@ export abstract class DirectedAcyclicGraphBase<T = unknown> {
   }
 
   private async _verifyAcyclicityLocal(useWasm: boolean) {
-    let acyclicVerifier: AcyclicVerifier;
-
-    if (useWasm && DirectedAcyclicGraphBase._supportsWasm) {
-      if (!DirectedAcyclicGraphBase._wasmModule) {
-        DirectedAcyclicGraphBase._wasmModule = await instantiateWasmModule();
-      }
-
-      acyclicVerifier = DirectedAcyclicGraphBase._wasmModule.verifyAcyclicity;
-    } else {
-      acyclicVerifier = verifyAcyclicity;
-    }
+    const acyclicVerifier = await DirectedAcyclicGraphBase._getLocalFunction(
+      useWasm,
+      'verifyAcyclicity'
+    );
 
     const cycleDetected = acyclicVerifier(this._outEdges, this._inEdges);
 
@@ -163,17 +205,10 @@ export abstract class DirectedAcyclicGraphBase<T = unknown> {
   }
 
   private async _topologicalSortLocal(useWasm: boolean) {
-    let topologicalSorter: TopologicalSorter;
-
-    if (useWasm && DirectedAcyclicGraphBase._supportsWasm) {
-      if (!DirectedAcyclicGraphBase._wasmModule) {
-        DirectedAcyclicGraphBase._wasmModule = await instantiateWasmModule();
-      }
-
-      topologicalSorter = DirectedAcyclicGraphBase._wasmModule.topologicalSort;
-    } else {
-      topologicalSorter = topologicalSort;
-    }
+    const topologicalSorter = await DirectedAcyclicGraphBase._getLocalFunction(
+      useWasm,
+      'topologicalSort'
+    );
 
     const topologicallySorted = topologicalSorter(this._outEdges);
 
@@ -245,6 +280,21 @@ export abstract class DirectedAcyclicGraphBase<T = unknown> {
     }
 
     return errorParameters;
+  }
+
+  protected _clone(
+    DirectedAcyclicGraph: Constructor<IDirectedAcyclicGraph<T>>,
+    parameters?: Omit<DirectedAcyclicGraphParameters<T>, 'vertices' | 'edges'>
+  ) {
+    return new DirectedAcyclicGraph({
+      ...(parameters ?? {
+        vertexCardinalityWasmThreshold: this.vertexCardinalityWasmThreshold,
+        vertexCardinalityWebWorkerThreshold:
+          this.vertexCardinalityWebWorkerThreshold
+      }),
+      vertices: this.vertices,
+      edges: this.edges
+    });
   }
 
   private get _useWasm() {

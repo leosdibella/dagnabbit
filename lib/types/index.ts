@@ -12,3 +12,5 @@ export * from './web-worker-parameters';
 export * from './web-worker-message';
 export * from './web-worker-function-definition';
 export * from './directed-acyclic-graph-parameters';
+export * from './web-worker-function';
+export * from './constructor';

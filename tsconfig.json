@@ -1,4 +1,5 @@
 {
+  "extends": "assemblyscript/std/portable.json",
   "compilerOptions": {
     "esModuleInterop": true,
     "noUnusedLocals": true,
@@ -20,7 +21,8 @@
       "@app/*": ["../app/*"]
     },
     "target": "ES2019",
-    "typeRoots": ["node_modules/@types"],
+    "typeRoots": ["node_modules/@types", "node_modules/assemblyscript/std/types/portable"],
+    "types": ["node"],
     "lib": ["dom", "ES2020", "ES2021", "ES2022", "WebWorker"],
     "strictNullChecks": true,
     "strictPropertyInitialization": true,
@@ -28,14 +30,16 @@
     "allowJs": true
   },
   "include": [
-    "./api/**/*.ts",
     "./app/**/*.ts",
+    "./api/**/*.ts",
     "./lib/**/*.ts",
     "./shared/**/*.ts",
-    "./lib/utilities/wasm.js" 
+    "./lib/browser/wasm.js",
+    "./lib/node/wasm.js",
+    "./tests/**/*.spec.ts",
+    "./vitest.config.ts"
   ],
   "exclude": [
-    "./node_modules",
-    "./tests"
+    "./node_modules"
   ]
 }

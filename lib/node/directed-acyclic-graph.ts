@@ -1,6 +1,6 @@
 import { IDirectedAcyclicGraph } from 'lib/interfaces';
 import { DirectedAcyclicGraphBase } from 'lib/classes';
-import { instantiateWasmModule } from 'lib/utilities';
+import { instantiateWasmModule } from './wasm';
 import {
   WebWorkerFunctionName,
   WebWorkerResponse,
@@ -21,6 +21,8 @@ export class DirectedAcyclicGraph<T = unknown>
 
     DirectedAcyclicGraphBase._webWorkerFactory =
       DirectedAcyclicGraph._createWebWorker;
+
+    DirectedAcyclicGraphBase._instantiateWasmModule = instantiateWasmModule;
   }
 
   private static readonly _webWorkerOptions: Readonly<WorkerOptions> = {
@@ -97,9 +99,9 @@ export class DirectedAcyclicGraph<T = unknown>
     const webWorkerMessage: WebWorkerMessage<U> = {
       webWorkerArguments: parameters.webWorkerArguments,
       webWorkerFunctionDefinition:
-        this._webWorkerFunctionDefinitions[parameters.wasmModuleFunctionName][
-          webWorkerType
-        ],
+        DirectedAcyclicGraphBase._webWorkerFunctionDefinitions[
+          parameters.wasmModuleFunctionName
+        ][webWorkerType],
       wasmModuleFunctionName: parameters.wasmModuleFunctionName
     };
 
@@ -114,15 +116,10 @@ export class DirectedAcyclicGraph<T = unknown>
 
   public clone(
     parameters?: Omit<DirectedAcyclicGraphParameters<T>, 'vertices' | 'edges'>
-  ) {
-    return new DirectedAcyclicGraph({
-      ...(parameters ?? {
-        vertexCardinalityWasmThreshold: this.vertexCardinalityWasmThreshold,
-        vertexCardinalityWebWorkerThreshold:
-          this.vertexCardinalityWebWorkerThreshold
-      }),
-      vertices: this.vertices,
-      edges: this.edges
-    });
+  ): DirectedAcyclicGraph<T> {
+    return super._clone(
+      DirectedAcyclicGraph,
+      parameters
+    ) as DirectedAcyclicGraph<T>;
   }
 }

@@ -1,4 +1,5 @@
 {
+  "extends": "assemblyscript/std/portable.json",
   "compilerOptions": {
     "esModuleInterop": true,
     "noUnusedLocals": true,
@@ -18,8 +19,8 @@
       "@lib/*": ["../lib/*"]
     },
     "target": "ES2019",
-    "typeRoots": ["node_modules/@types"],
-    "types": ["assemblyscript/std/types/portable", "node"],
+    "typeRoots": ["node_modules/@types", "node_modules/assemblyscript/std/types/portable"],
+    "types": ["node"],
     "lib": ["dom", "ES2020"],
     "strictNullChecks": true,
     "strictPropertyInitialization": true,
@@ -29,7 +30,8 @@
   "include": [
     "./shared/**/*.ts",
     "./lib/**/*.ts",
-    "./lib/utilities/wasm.js"
+    "./lib/node/wasm.js",
+    "./lib/browser/wasm.js"
   ],
   "exclude": [
     "./node_modules",
